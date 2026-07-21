@@ -1,0 +1,51 @@
+# EdgeSphere — Monorepo
+
+node_modules/
+dist/
+.env
+*.env
+.env.local
+.env.*.local
+
+# Build outputs
+apps/*/dist/
+packages/*/dist/
+apps/dashboard/.next/
+apps/dashboard/out/
+
+# Go build
+apps/edge-server/bin/
+*.exe
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker volumes (local dev data)
+infra/docker/volumes/
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Terraform
+infra/terraform/.terraform/
+infra/terraform/terraform.tfstate
+infra/terraform/terraform.tfstate.backup
+*.tfvars
+
+# Temp
+tmp/
+temp/

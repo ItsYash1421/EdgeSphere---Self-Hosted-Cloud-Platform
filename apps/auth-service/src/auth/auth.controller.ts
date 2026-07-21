@@ -1,0 +1,104 @@
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Delete,
+  Param,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+  Request,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiResponse,
+} from '@nestjs/swagger';
+import { AuthService } from './auth.service';
+import { RegisterDto, LoginDto, RefreshTokenDto, CreateApiKeyDto } from './dto/auth.dto';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { TokenPair } from '@edgesphere/shared';
+
+@ApiTags('auth')
+@Controller('auth')
+export class AuthController {
+  constructor(private readonly authService: AuthService) {}
+
+  @Post('register')
+  @ApiOperation({ summary: 'Create a new account' })
+  @ApiResponse({ status: 201, description: 'Account created' })
+  async register(@Body() dto: RegisterDto): Promise<TokenPair> {
+    return this.authService.register(dto);
+  }
+
+  @Post('login')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Login and receive tokens' })
+  @ApiResponse({ status: 200, description: 'Login successful' })
+  async login(@Body() dto: LoginDto): Promise<TokenPair> {
+    return this.authService.login(dto);
+  }
+
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Refresh access token' })
+  async refresh(@Body() dto: RefreshTokenDto): Promise<TokenPair> {
+    return this.authService.refreshTokens(dto.refreshToken);
+  }
+
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Logout and invalidate refresh token' })
+  async logout(@Body() dto: RefreshTokenDto): Promise<void> {
+    return this.authService.logout(dto.refreshToken);
+  }
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get current user profile' })
+  async getProfile(@Request() req: { user: { sub: string } }) {
+    return this.authService.getProfile(req.user.sub);
+  }
+
+  @Post('api-keys')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Create a new API key' })
+  async createApiKey(
+    @Request() req: { user: { sub: string } },
+    @Body() dto: CreateApiKeyDto,
+  ) {
+    return this.authService.createApiKey(req.user.sub, dto.name);
+  }
+
+  @Get('api-keys')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'List all API keys' })
+  async listApiKeys(@Request() req: { user: { sub: string } }) {
+    return this.authService.listApiKeys(req.user.sub);
+  }
+
+  @Delete('api-keys/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Revoke an API key' })
+  async revokeApiKey(
+    @Request() req: { user: { sub: string } },
+    @Param('id') id: string,
+  ): Promise<void> {
+    return this.authService.revokeApiKey(req.user.sub, id);
+  }
+
+  @Get('health')
+  @ApiOperation({ summary: 'Service health check' })
+  health() {
+    return { status: 'ok', service: 'auth-service', timestamp: new Date() };
+  }
+}

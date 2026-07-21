@@ -1,0 +1,33 @@
+{
+  "name": "edgesphere",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Self-hosted cloud platform — CDN, Object Storage, API Gateway, Analytics",
+  "author": "Yash Kumar Meena",
+  "license": "MIT",
+  "packageManager": "pnpm@9.0.0",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "dev": "docker compose -f infra/docker/docker-compose.dev.yml up --build",
+    "dev:services": "pnpm -r --parallel run dev",
+    "build": "pnpm -r run build",
+    "test": "pnpm -r run test",
+    "test:e2e": "pnpm -r run test:e2e",
+    "lint": "pnpm -r run lint",
+    "format": "pnpm -r run format",
+    "typecheck": "pnpm -r run typecheck",
+    "clean": "pnpm -r run clean && rimraf node_modules"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "rimraf": "^5.0.0",
+    "typescript": "^5.5.0"
+  }
+}

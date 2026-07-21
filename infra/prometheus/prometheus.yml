@@ -1,0 +1,45 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'edgesphere-dev'
+
+scrape_configs:
+  - job_name: 'api-gateway'
+    static_configs:
+      - targets: ['api-gateway:3000']
+    metrics_path: '/metrics'
+
+  - job_name: 'auth-service'
+    static_configs:
+      - targets: ['auth-service:3001']
+    metrics_path: '/metrics'
+
+  - job_name: 'storage-service'
+    static_configs:
+      - targets: ['storage-service:3002']
+    metrics_path: '/metrics'
+
+  - job_name: 'analytics-service'
+    static_configs:
+      - targets: ['analytics-service:3003']
+    metrics_path: '/metrics'
+
+  - job_name: 'edge-server-a'
+    static_configs:
+      - targets: ['edge-server-a:8080']
+    metrics_path: '/metrics'
+
+  - job_name: 'edge-server-b'
+    static_configs:
+      - targets: ['edge-server-b:8081']
+    metrics_path: '/metrics'
+
+  - job_name: 'minio'
+    static_configs:
+      - targets: ['minio:9000']
+    metrics_path: '/minio/v2/metrics/cluster'
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

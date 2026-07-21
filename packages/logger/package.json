@@ -1,0 +1,19 @@
+{
+  "name": "@edgesphere/logger",
+  "version": "1.0.0",
+  "description": "Structured JSON logger for all EdgeSphere services",
+  "main": "./src/index.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {
+    "pino": "^9.0.0",
+    "pino-pretty": "^13.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "rimraf": "^5.0.0",
+    "typescript": "^5.5.0"
+  }
+}
