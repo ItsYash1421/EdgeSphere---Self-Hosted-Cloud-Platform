@@ -140,12 +140,10 @@ export class MinioService implements OnModuleInit {
   }
 
   /**
-   * Initiate a multipart upload.
-   * For files > 100MB, upload in parts for reliability and resumability.
+   * Multipart Upload Methods
    */
-  async initiateMultipartUpload(bucket: string, key: string): Promise<string> {
-    // MinIO handles multipart internally via the minio SDK
-    // Return a composite upload ID for tracking
-    return `${bucket}/${key}/${Date.now()}`;
+  // Expose raw client for the multipart methods
+  get getClient(): any {
+    return this.client;
   }
 }

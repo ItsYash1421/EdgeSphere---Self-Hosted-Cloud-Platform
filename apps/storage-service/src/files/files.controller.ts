@@ -38,9 +38,11 @@ export class FilesController {
     @Request() req,
     @Param('bucket') bucket: string,
     @Param('key') key: string,
+    @Query('version') version: string,
     @Res() res: Response
   ) {
-    const { stream, contentType, size, etag } = await this.filesService.downloadFile(req.user.sub, bucket, key);
+    const parsedVersion = version ? parseInt(version, 10) : undefined;
+    const { stream, contentType, size, etag } = await this.filesService.downloadFile(req.user.sub, bucket, key, parsedVersion);
     
     res.set({
       'Content-Type': contentType,

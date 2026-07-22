@@ -44,22 +44,39 @@ export class FilesService {
       { originalname: file.originalname }
     );
 
+    let version = 1;
+    const existingFile = await this.fileRepo.findOne({ where: { bucketId: bucket.id, key: finalKey, isLatest: true } });
+    if (existingFile) {
+      existingFile.isLatest = false;
+      await this.fileRepo.save(existingFile);
+      version = existingFile.version + 1;
+    }
+
     const fileRecord = this.fileRepo.create({
       bucketId: bucket.id,
       key: finalKey,
       size: file.size,
       contentType: file.mimetype,
       etag,
+      version,
+      isLatest: true,
       metadata: { originalname: file.originalname },
     });
 
     return this.fileRepo.save(fileRecord);
   }
 
-  async downloadFile(userId: string, bucketName: string, key: string) {
+  async downloadFile(userId: string, bucketName: string, key: string, version?: number) {
     const bucket = await this.getBucketOrThrow(userId, bucketName, false);
     
-    const fileRecord = await this.fileRepo.findOne({ where: { bucketId: bucket.id, key } });
+    const whereClause: any = { bucketId: bucket.id, key };
+    if (version !== undefined) {
+      whereClause.version = version;
+    } else {
+      whereClause.isLatest = true;
+    }
+
+    const fileRecord = await this.fileRepo.findOne({ where: whereClause });
     if (!fileRecord) {
       throw new NotFoundException('File not found');
     }
