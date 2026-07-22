@@ -9,6 +9,8 @@ import {
   HttpCode,
   HttpStatus,
   Request,
+  Req,
+  Headers,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -37,15 +39,25 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Login and receive tokens' })
   @ApiResponse({ status: 200, description: 'Login successful' })
-  async login(@Body() dto: LoginDto): Promise<TokenPair> {
-    return this.authService.login(dto);
+  async login(
+    @Body() dto: LoginDto,
+    @Req() req: any,
+    @Headers('user-agent') userAgent: string = '',
+  ): Promise<TokenPair> {
+    const ip = req.ip || '127.0.0.1';
+    return this.authService.login(dto, ip, userAgent);
   }
 
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Refresh access token' })
-  async refresh(@Body() dto: RefreshTokenDto): Promise<TokenPair> {
-    return this.authService.refreshTokens(dto.refreshToken);
+  async refresh(
+    @Body() dto: RefreshTokenDto,
+    @Req() req: any,
+    @Headers('user-agent') userAgent: string = '',
+  ): Promise<TokenPair> {
+    const ip = req.ip || '127.0.0.1';
+    return this.authService.refreshTokens(dto.refreshToken, ip, userAgent);
   }
 
   @Post('logout')
@@ -53,8 +65,11 @@ export class AuthController {
   @ApiBearerAuth()
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Logout and invalidate refresh token' })
-  async logout(@Body() dto: RefreshTokenDto): Promise<void> {
-    return this.authService.logout(dto.refreshToken);
+  async logout(
+    @Body() dto: RefreshTokenDto,
+    @Request() req: { user: { sub: string } },
+  ): Promise<void> {
+    return this.authService.logout(req.user.sub, dto.refreshToken);
   }
 
   @Get('me')

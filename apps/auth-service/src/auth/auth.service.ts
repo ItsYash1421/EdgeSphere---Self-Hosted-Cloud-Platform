@@ -11,6 +11,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { UserEntity } from '../users/user.entity';
 import { LoginDto, RegisterDto } from './dto/auth.dto';
@@ -23,6 +24,7 @@ const logger = createLogger('auth-service');
 export class AuthService {
   private readonly REFRESH_TOKEN_TTL = 7 * 24 * 60 * 60; // 7 days in seconds
   private readonly BCRYPT_ROUNDS = 12;
+  private readonly MAX_SESSIONS = 5;
 
   constructor(
     @InjectRepository(UserEntity)
@@ -32,10 +34,6 @@ export class AuthService {
     @InjectRedis() private readonly redis: Redis,
   ) {}
 
-  /**
-   * Register a new user.
-   * Returns token pair on success.
-   */
   async register(dto: RegisterDto): Promise<TokenPair> {
     const existing = await this.usersRepo.findOne({ where: { email: dto.email } });
     if (existing) {
@@ -47,14 +45,10 @@ export class AuthService {
     await this.usersRepo.save(user);
 
     logger.info({ userId: user.id, email: user.email }, 'User registered');
-    return this.generateTokenPair(user);
+    return this.generateTokenPair(user, '127.0.0.1', '');
   }
 
-  /**
-   * Login with email + password.
-   * Returns token pair on success.
-   */
-  async login(dto: LoginDto): Promise<TokenPair> {
+  async login(dto: LoginDto, ip: string, userAgent: string): Promise<TokenPair> {
     const user = await this.usersRepo.findOne({ where: { email: dto.email } });
     if (!user || !user.passwordHash) {
       throw new UnauthorizedException('Invalid credentials');
@@ -69,43 +63,58 @@ export class AuthService {
       throw new UnauthorizedException('Account disabled');
     }
 
-    await this.usersRepo.update(user.id, { lastLoginAt: new Date() });
+    await this.usersRepo.update(user.id, { lastLoginAt: new Date(), lastLoginIp: ip });
     logger.info({ userId: user.id }, 'User logged in');
-    return this.generateTokenPair(user);
+    return this.generateTokenPair(user, ip, userAgent);
   }
 
-  /**
-   * Rotate refresh token.
-   * Old token is blacklisted; new pair returned.
-   */
-  async refreshTokens(refreshToken: string): Promise<TokenPair> {
-    const userId = await this.redis.get(`refresh:${refreshToken}`);
-    if (!userId) {
+  async loginOAuth(user: UserEntity, ip: string, userAgent: string): Promise<TokenPair> {
+    if (!user.isActive) {
+      throw new UnauthorizedException('Account disabled');
+    }
+    await this.usersRepo.update(user.id, { lastLoginAt: new Date(), lastLoginIp: ip });
+    logger.info({ userId: user.id }, 'User logged in via OAuth');
+    return this.generateTokenPair(user, ip, userAgent);
+  }
+
+  async refreshTokens(refreshToken: string, ip: string, userAgent: string): Promise<TokenPair> {
+    try {
+      const parts = Buffer.from(refreshToken, 'base64').toString('utf-8').split(':');
+      if (parts.length !== 3) {
+        throw new UnauthorizedException('Invalid refresh token format');
+      }
+      const [userId, deviceId] = parts;
+
+      const storedToken = await this.redis.get(`refresh:${userId}:${deviceId}`);
+      if (storedToken !== refreshToken) {
+        throw new UnauthorizedException('Invalid or expired refresh token');
+      }
+
+      await this.redis.del(`refresh:${userId}:${deviceId}`);
+
+      const user = await this.usersRepo.findOne({ where: { id: userId } });
+      if (!user || !user.isActive) {
+        throw new UnauthorizedException('User not found or disabled');
+      }
+
+      return this.generateTokenPair(user, ip, userAgent, deviceId);
+    } catch (e) {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
-
-    // One-time use: delete old token
-    await this.redis.del(`refresh:${refreshToken}`);
-
-    const user = await this.usersRepo.findOne({ where: { id: userId } });
-    if (!user || !user.isActive) {
-      throw new UnauthorizedException('User not found or disabled');
-    }
-
-    return this.generateTokenPair(user);
   }
 
-  /**
-   * Invalidate a refresh token (logout).
-   */
-  async logout(refreshToken: string): Promise<void> {
-    await this.redis.del(`refresh:${refreshToken}`);
-    logger.info('User logged out');
+  async logout(userId: string, refreshToken: string): Promise<void> {
+    try {
+      const parts = Buffer.from(refreshToken, 'base64').toString('utf-8').split(':');
+      if (parts.length === 3) {
+        const [, deviceId] = parts;
+        await this.redis.del(`refresh:${userId}:${deviceId}`);
+        await this.redis.zrem(`user_sessions:${userId}`, deviceId);
+      }
+    } catch(e) {}
+    logger.info({ userId }, 'User logged out');
   }
 
-  /**
-   * Get user profile by ID.
-   */
   async getProfile(userId: string) {
     const user = await this.usersRepo.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
@@ -114,20 +123,16 @@ export class AuthService {
     return profile;
   }
 
-  /**
-   * Create an API key for the user.
-   * Returns the raw key ONCE — only the hash is stored.
-   */
   async createApiKey(userId: string, name: string) {
-    const rawKey = `esk_${uuidv4().replace(/-/g, '')}`;  // EdgeSphere Key
+    const rawKey = `esk_${uuidv4().replace(/-/g, '')}`;
     const keyHash = await bcrypt.hash(rawKey, 10);
     const keyPrefix = rawKey.substring(0, 12);
 
-    await this.redis.set(`apikey:${keyHash}`, userId, 'EX', 60 * 60 * 24 * 365); // 1 year
+    await this.redis.set(`apikey:${keyHash}`, userId, 'EX', 60 * 60 * 24 * 365);
 
     logger.info({ userId, name }, 'API key created');
     return {
-      key: rawKey,  // ONLY time the full key is returned
+      key: rawKey,
       keyPrefix,
       name,
       createdAt: new Date(),
@@ -135,26 +140,15 @@ export class AuthService {
     };
   }
 
-  /**
-   * List API keys (without the actual key value).
-   */
   async listApiKeys(userId: string) {
-    // In production, this would query an api_keys table
-    // Simplified for Phase 1
     return { keys: [], message: 'API key listing requires database table — TODO Phase 1' };
   }
 
-  /**
-   * Revoke an API key.
-   */
   async revokeApiKey(userId: string, keyId: string): Promise<void> {
-    // In production, mark as revoked in DB and delete from Redis
     logger.info({ userId, keyId }, 'API key revoked');
   }
 
-  // ─── Private Helpers ─────────────────────────────────────────────────────
-
-  private async generateTokenPair(user: UserEntity): Promise<TokenPair> {
+  private async generateTokenPair(user: UserEntity, ip: string, userAgent: string, existingDeviceId?: string): Promise<TokenPair> {
     const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
@@ -162,18 +156,31 @@ export class AuthService {
     };
 
     const accessToken = await this.jwtService.signAsync(payload);
-    const refreshToken = uuidv4();
+    
+    const deviceId = existingDeviceId || crypto.createHash('sha256').update(userAgent || 'unknown').digest('hex');
+    const rawRefresh = `${user.id}:${deviceId}:${uuidv4()}`;
+    const refreshToken = Buffer.from(rawRefresh).toString('base64');
 
-    // Store refresh token in Redis with TTL
+    const sessionKey = `user_sessions:${user.id}`;
+    await this.redis.zadd(sessionKey, Date.now(), deviceId);
+    
+    const sessionCount = await this.redis.zcard(sessionKey);
+    if (sessionCount > this.MAX_SESSIONS) {
+      const oldest = await this.redis.zrange(sessionKey, 0, 0);
+      if (oldest.length > 0) {
+        await this.redis.del(`refresh:${user.id}:${oldest[0]}`);
+        await this.redis.zrem(sessionKey, oldest[0]);
+      }
+    }
+
     await this.redis.set(
-      `refresh:${refreshToken}`,
-      user.id,
+      `refresh:${user.id}:${deviceId}`,
+      refreshToken,
       'EX',
       this.REFRESH_TOKEN_TTL,
     );
 
     const expiresIn = this.parseExpiry(this.config.get('JWT_EXPIRES_IN', '15m'));
-
     return { accessToken, refreshToken, expiresIn };
   }
 
