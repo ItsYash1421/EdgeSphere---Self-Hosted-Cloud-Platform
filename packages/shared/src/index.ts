@@ -9,6 +9,9 @@ export * from './phase2';
 // Phase 3 — Kafka Events, Analytics DTOs, Notification Types
 export * from './phase3';
 
+// Phase 4 — Circuit Breaker, DLQ, WebSocket, OAuth2, Multipart Upload
+export * from './phase4';
+
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
 export enum UserRole {
