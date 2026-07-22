@@ -3,6 +3,9 @@
  * Shared types, interfaces, DTOs, and constants across all EdgeSphere services.
  */
 
+// Phase 2 — CDN, Image Optimization, Cache Invalidation
+export * from './phase2';
+
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
 export enum UserRole {
