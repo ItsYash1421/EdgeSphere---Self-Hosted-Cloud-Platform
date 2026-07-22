@@ -7,6 +7,7 @@ import { MetricsModule } from './metrics/metrics.module';
 import { HealthModule } from './health/health.module';
 import { AuthMiddleware } from './middleware/auth.middleware';
 import { LoggingMiddleware } from './middleware/logging.middleware';
+import { CdnCacheMiddleware } from './middleware/cdn-cache.middleware';
 
 @Module({
   imports: [
@@ -30,12 +31,17 @@ export class AppModule implements NestModule {
       .forRoutes('*');
 
     consumer
+      .apply(CdnCacheMiddleware)
+      .forRoutes({ path: 'cdn/*', method: RequestMethod.GET });
+
+    consumer
       .apply(AuthMiddleware)
       .exclude(
         { path: 'v1/auth/register', method: RequestMethod.ALL },
         { path: 'v1/auth/login', method: RequestMethod.ALL },
         { path: 'health', method: RequestMethod.ALL },
         { path: 'metrics', method: RequestMethod.ALL },
+        { path: 'cdn/(.*)', method: RequestMethod.ALL },
       )
       .forRoutes('*');
   }

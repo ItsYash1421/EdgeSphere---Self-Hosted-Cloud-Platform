@@ -3,14 +3,30 @@ import { Request, Response, NextFunction } from 'express';
 import { ProxyService } from './proxy.service';
 import { RateLimitService } from '../rate-limit/rate-limit.service';
 
-@Controller('v1')
+@Controller()
 export class ProxyController {
   constructor(
     private readonly proxyService: ProxyService,
     private readonly rateLimitService: RateLimitService,
   ) {}
 
-  @All(':service/*')
+  @All('cdn/*')
+  async proxyCdn(
+    @Req() req: Request & { user?: any },
+    @Res() res: Response,
+    @Next() next: NextFunction,
+  ) {
+    // Basic rate limit for CDN, or maybe skip?
+    const ip = req.ip || 'unknown';
+    const swLimit = await this.rateLimitService.slidingWindow(ip);
+    if (!swLimit.allowed) {
+      return res.status(429).json({ message: 'Too Many Requests' });
+    }
+
+    this.proxyService.handle(req, res, next, 'cdn');
+  }
+
+  @All('v1/:service/*')
   async proxyAll(
     @Req() req: Request & { user?: any },
     @Res() res: Response,
@@ -36,3 +52,4 @@ export class ProxyController {
     this.proxyService.handle(req, res, next, service);
   }
 }
+
