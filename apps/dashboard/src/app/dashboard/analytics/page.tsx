@@ -1,77 +1,91 @@
 'use client';
 
+import { useState } from 'react';
+import useSWR from 'swr';
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, LineChart, Line
 } from 'recharts';
 
-const generateData = (n: number) => Array.from({ length: n }, (_, i) => ({
-  time: `${String(i).padStart(2, '0')}:00`,
-  requests: Math.floor(Math.random() * 5000 + 1000),
-  errors: Math.floor(Math.random() * 50),
-  cacheHit: Math.floor(Math.random() * 3000 + 500),
-  latency: Math.floor(Math.random() * 100 + 15),
-  bandwidth: Math.floor(Math.random() * 500 + 100),
-}));
+const BASE = process.env.NEXT_PUBLIC_API_URL + '/analytics';
 
-const GEO_DATA = [
-  { country: '🇮🇳 India', requests: 842340, pct: 34 },
-  { country: '🇺🇸 United States', requests: 623112, pct: 25 },
-  { country: '🇩🇪 Germany', requests: 312445, pct: 12 },
-  { country: '🇬🇧 United Kingdom', requests: 248901, pct: 10 },
-  { country: '🇯🇵 Japan', requests: 198234, pct: 8 },
-  { country: '🌍 Others', requests: 274968, pct: 11 },
-];
-
-const PIE_DATA = [
-  { name: 'Cache HIT', value: 84.2, color: '#22c55e' },
-  { name: 'Cache MISS', value: 15.8, color: '#6366f1' },
-];
-
-const TOP_FILES = [
-  { key: 'assets/hero.webp', hits: 48293, size: '245 KB', bandwidth: '11.2 GB' },
-  { key: 'videos/demo.mp4', hits: 12847, size: '50 MB', bandwidth: '625 GB' },
-  { key: 'css/main.css', hits: 38201, size: '42 KB', bandwidth: '1.6 GB' },
-  { key: 'js/bundle.js', hits: 35092, size: '280 KB', bandwidth: '9.5 GB' },
-  { key: 'images/logo.svg', hits: 28439, size: '8 KB', bandwidth: '222 MB' },
-];
+const fetcher = (url: string) => {
+  const token = localStorage.getItem('access_token');
+  return fetch(url, { headers: { Authorization: `Bearer ${token}` } }).then(res => res.json());
+};
 
 const TOOLTIP_STYLE = {
-  background: 'var(--bg-elevated)',
+  backgroundColor: 'var(--bg-surface)',
   border: '1px solid var(--border)',
-  borderRadius: 8,
-  padding: '8px 12px',
-  fontSize: 12,
+  borderRadius: '6px',
   color: 'var(--text-primary)',
+  fontSize: '12px',
+  boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
 };
 
 export default function AnalyticsPage() {
-  const data = generateData(24);
+  const [windowTime, setWindowTime] = useState('60'); // default 1h = 60m
+
+  const { data: summaryData, error: summaryError } = useSWR(`${BASE}/summary?window=${windowTime}`, fetcher, { refreshInterval: 10000 });
+  const { data: rateData } = useSWR(`${BASE}/requests/rate?window=${windowTime}`, fetcher, { refreshInterval: 15000 });
+  const { data: latencyData } = useSWR(`${BASE}/latency/percentiles?window=${windowTime}`, fetcher, { refreshInterval: 30000 });
+  const { data: cacheData } = useSWR(`${BASE}/cache/ratio?window=${windowTime}`, fetcher, { refreshInterval: 15000 });
+  const { data: geoData } = useSWR(`${BASE}/geo?window=${windowTime}`, fetcher, { refreshInterval: 30000 });
+  const { data: pathsData } = useSWR(`${BASE}/requests/top-paths?window=${windowTime}`, fetcher, { refreshInterval: 30000 });
+  const { data: errorData } = useSWR(`${BASE}/errors?window=${windowTime}`, fetcher, { refreshInterval: 15000 });
+
+  const summary = summaryData?.data || { requests: 0, cacheHitRate: 0, p95Latency: 0, bandwidth: 0, errorRate: 0 };
+  const rateSeries = rateData?.data || [];
+  const latencySeries = latencyData?.data || [];
+  const cacheRatio = cacheData?.data || { hit: 0, miss: 0 };
+  const geoStats = geoData?.data || [];
+  const topPaths = pathsData?.data || [];
+  const errors = errorData?.data || [];
+
+  const PIE_DATA = [
+    { name: 'Cache Hit', value: Math.round(cacheRatio.hit), color: '#22c55e' },
+    { name: 'Cache Miss', value: Math.round(cacheRatio.miss), color: '#ef4444' }
+  ];
 
   return (
     <div>
-      <div className="page-header">
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div>
           <h1 className="page-title">Analytics</h1>
-          <p className="page-subtitle">Request metrics, cache performance, and traffic insights</p>
+          <p className="page-subtitle">Real-time request metrics, cache performance, and traffic insights</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          {['1h', '24h', '7d', '30d'].map(range => (
-            <button key={range} className={`btn btn-sm ${range === '24h' ? 'btn-primary' : 'btn-secondary'}`}>
-              {range}
+          {[
+            { label: '1h', val: '60' },
+            { label: '6h', val: '360' },
+            { label: '24h', val: '1440' },
+            { label: '7d', val: '10080' }
+          ].map(range => (
+            <button 
+              key={range.val} 
+              onClick={() => setWindowTime(range.val)}
+              className={`btn btn-sm ${windowTime === range.val ? 'btn-primary' : 'btn-secondary'}`}
+            >
+              {range.label}
             </button>
           ))}
         </div>
       </div>
 
+      {summaryError && (
+        <div style={{ background: 'var(--red)20', color: 'var(--red)', padding: 12, borderRadius: 8, marginBottom: 24, fontSize: 13 }}>
+          Error loading analytics data. Retrying...
+        </div>
+      )}
+
       {/* KPI Row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 14, marginBottom: 24 }}>
         {[
-          { label: 'Total Requests', value: '2.4M', sub: '+12.4%', color: 'var(--brand)' },
-          { label: 'Cache Hit Rate', value: '84.2%', sub: '+2.1%', color: 'var(--green)' },
-          { label: 'P95 Latency', value: '94ms', sub: '-8ms', color: 'var(--blue)' },
-          { label: 'Bandwidth', value: '847 GB', sub: '+8.7%', color: 'var(--yellow)' },
-          { label: 'Error Rate', value: '0.08%', sub: '-0.01%', color: 'var(--red)' },
+          { label: 'Total Requests', value: summary.requests.toLocaleString(), color: 'var(--brand)' },
+          { label: 'Cache Hit Rate', value: `${summary.cacheHitRate.toFixed(1)}%`, color: 'var(--green)' },
+          { label: 'P95 Latency', value: `${Math.round(summary.p95Latency)}ms`, color: 'var(--blue)' },
+          { label: 'Bandwidth', value: `${(summary.bandwidth / (1024*1024)).toFixed(2)} MB`, color: 'var(--yellow)' },
+          { label: 'Error Rate', value: `${summary.errorRate.toFixed(2)}%`, color: 'var(--red)' },
         ].map(kpi => (
           <div key={kpi.label} style={{
             background: 'var(--bg-surface)', border: '1px solid var(--border)',
@@ -81,10 +95,7 @@ export default function AnalyticsPage() {
               {kpi.label}
             </div>
             <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>
-              {kpi.value}
-            </div>
-            <div style={{ fontSize: 11.5, color: 'var(--green)', marginTop: 4, fontWeight: 500 }}>
-              {kpi.sub} vs yesterday
+              {!summaryData && !summaryError ? '...' : kpi.value}
             </div>
           </div>
         ))}
@@ -95,20 +106,16 @@ export default function AnalyticsPage() {
         <div className="card">
           <div className="card-header">
             <div>
-              <div className="card-title">Requests & Cache Hits</div>
-              <div className="card-description">24-hour traffic volume</div>
+              <div className="card-title">Requests Rate</div>
+              <div className="card-description">Requests over time</div>
             </div>
           </div>
           <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={data}>
+            <AreaChart data={rateSeries}>
               <defs>
                 <linearGradient id="reqG" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
                   <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="cacheG" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#22c55e" stopOpacity={0.25} />
-                  <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
@@ -116,7 +123,6 @@ export default function AnalyticsPage() {
               <YAxis tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} />
               <Tooltip contentStyle={TOOLTIP_STYLE} />
               <Area type="monotone" dataKey="requests" stroke="#6366f1" strokeWidth={2} fill="url(#reqG)" name="Requests" />
-              <Area type="monotone" dataKey="cacheHit" stroke="#22c55e" strokeWidth={2} fill="url(#cacheG)" name="Cache Hits" />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -157,12 +163,14 @@ export default function AnalyticsPage() {
             <div className="card-description">P50 / P95 / P99 over time</div>
           </div>
           <ResponsiveContainer width="100%" height={180}>
-            <LineChart data={data}>
+            <LineChart data={latencySeries}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
               <XAxis dataKey="time" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} />
               <YAxis tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} />
               <Tooltip contentStyle={TOOLTIP_STYLE} />
-              <Line type="monotone" dataKey="latency" stroke="#6366f1" strokeWidth={2} dot={false} name="Avg Latency" />
+              <Line type="monotone" dataKey="p50" stroke="#22c55e" strokeWidth={2} dot={false} name="P50" />
+              <Line type="monotone" dataKey="p95" stroke="#eab308" strokeWidth={2} dot={false} name="P95" />
+              <Line type="monotone" dataKey="p99" stroke="#ef4444" strokeWidth={2} dot={false} name="P99" />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -172,47 +180,78 @@ export default function AnalyticsPage() {
             <div className="card-title">Geographic Distribution</div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {GEO_DATA.map(geo => (
+            {geoStats.map((geo: any) => (
               <div key={geo.country}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <span style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>{geo.country}</span>
+                  <span style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>{geo.country || 'Unknown'}</span>
                   <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-primary)' }}>
-                    {(geo.requests / 1000).toFixed(0)}K ({geo.pct}%)
+                    {geo.requests.toLocaleString()} ({geo.pct}%)
                   </span>
                 </div>
                 <div className="progress-bar">
-                  <div className="progress-fill" style={{ width: `${geo.pct}%` }} />
+                  <div className="progress-fill" style={{ width: `${geo.pct}%`, background: 'var(--brand)' }} />
                 </div>
               </div>
             ))}
+            {geoStats.length === 0 && (
+              <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 13, padding: 20 }}>
+                No geographic data available
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Top Files */}
-      <div>
-        <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>Top Accessed Files</h2>
-        <div className="table-container">
+      {/* Row 4: Top Paths & Errors */}
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16 }}>
+        <div className="card">
+          <div className="card-header">
+            <h3 className="card-title">Top Paths</h3>
+          </div>
           <table className="table">
             <thead>
               <tr>
-                <th>#</th>
-                <th>File</th>
-                <th>Cache Hits</th>
-                <th>File Size</th>
-                <th>Bandwidth</th>
+                <th>Path</th>
+                <th>Requests</th>
+                <th>Avg Latency</th>
               </tr>
             </thead>
             <tbody>
-              {TOP_FILES.map((f, i) => (
-                <tr key={f.key}>
-                  <td style={{ color: 'var(--text-muted)', fontWeight: 600, width: 40 }}>{i + 1}</td>
-                  <td><code style={{ fontSize: 12 }}>{f.key}</code></td>
-                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{f.hits.toLocaleString()}</td>
-                  <td><span className="badge badge-brand">{f.size}</span></td>
-                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{f.bandwidth}</td>
+              {topPaths.map((p: any, i: number) => (
+                <tr key={i}>
+                  <td><code style={{ fontSize: 12 }}>{p.path}</code></td>
+                  <td>{p.count.toLocaleString()}</td>
+                  <td>{Math.round(p.avgLatency)}ms</td>
                 </tr>
               ))}
+              {topPaths.length === 0 && (
+                <tr><td colSpan={3} style={{ textAlign: 'center', padding: 20 }}>No path data</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="card">
+          <div className="card-header">
+            <h3 className="card-title">Errors</h3>
+          </div>
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Status</th>
+                <th>Count</th>
+              </tr>
+            </thead>
+            <tbody>
+              {errors.map((e: any, i: number) => (
+                <tr key={i}>
+                  <td><span className="badge" style={{ background: 'var(--red)20', color: 'var(--red)' }}>{e.status}</span></td>
+                  <td>{e.count.toLocaleString()}</td>
+                </tr>
+              ))}
+              {errors.length === 0 && (
+                <tr><td colSpan={2} style={{ textAlign: 'center', padding: 20 }}>No errors</td></tr>
+              )}
             </tbody>
           </table>
         </div>
