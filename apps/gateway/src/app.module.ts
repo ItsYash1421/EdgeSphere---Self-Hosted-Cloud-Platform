@@ -5,6 +5,7 @@ import { ProxyModule } from './proxy/proxy.module';
 import { RateLimitModule } from './rate-limit/rate-limit.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { HealthModule } from './health/health.module';
+import { EventsModule } from './events/events.module';
 import { AuthMiddleware } from './middleware/auth.middleware';
 import { LoggingMiddleware } from './middleware/logging.middleware';
 import { CdnCacheMiddleware } from './middleware/cdn-cache.middleware';
@@ -22,6 +23,7 @@ import { CdnCacheMiddleware } from './middleware/cdn-cache.middleware';
     RateLimitModule,
     MetricsModule,
     HealthModule,
+    EventsModule,
   ],
 })
 export class AppModule implements NestModule {
