@@ -6,6 +6,9 @@
 // Phase 2 — CDN, Image Optimization, Cache Invalidation
 export * from './phase2';
 
+// Phase 3 — Kafka Events, Analytics DTOs, Notification Types
+export * from './phase3';
+
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
 export enum UserRole {
