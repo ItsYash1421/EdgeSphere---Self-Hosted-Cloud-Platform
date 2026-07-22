@@ -3,6 +3,7 @@
 import { useEffect, useState, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import { RealtimeIndicator } from '../../components/RealtimeIndicator';
 
 const NAV_ITEMS = [
   { label: 'Overview', href: '/dashboard', icon: '◈', section: 'main' },
@@ -151,6 +152,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
           {/* Topbar actions */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <RealtimeIndicator />
             <a
               href="http://localhost:3200"
               target="_blank"

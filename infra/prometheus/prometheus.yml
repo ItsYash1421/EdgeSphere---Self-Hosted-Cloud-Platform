@@ -63,3 +63,8 @@ scrape_configs:
     static_configs:
       - targets: ['notification-service:3005']
     metrics_path: '/metrics'
+
+  - job_name: 'websocket-gateway'
+    static_configs:
+      - targets: ['websocket-gateway:3006']
+    metrics_path: '/metrics'

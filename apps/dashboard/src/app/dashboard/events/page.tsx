@@ -1,33 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import useSWR from 'swr';
-
-const BASE = process.env.NEXT_PUBLIC_API_URL + '/analytics';
-
-const fetcher = (url: string) => {
-  const token = localStorage.getItem('access_token');
-  return fetch(url, {
-    headers: { Authorization: `Bearer ${token}` }
-  }).then(res => res.json());
-};
+import { useState } from 'react';
+import { useRealtimeEvents } from '../../../hooks/useRealtimeEvents';
 
 export default function LiveEventsPage() {
   const [isPaused, setIsPaused] = useState(false);
+  const liveEvents = useRealtimeEvents(100);
   const [events, setEvents] = useState<any[]>([]);
 
-  // We fetch every 3 seconds
-  const { data, error } = useSWR(isPaused ? null : `${BASE}/events/recent?limit=100`, fetcher, {
-    refreshInterval: 3000,
-    revalidateOnFocus: false,
-    keepPreviousData: true
-  });
-
-  useEffect(() => {
-    if (data?.data && Array.isArray(data.data)) {
-      setEvents(data.data);
-    }
-  }, [data]);
+  // Keep a frozen copy when paused
+  if (!isPaused && liveEvents !== events) {
+    setEvents(liveEvents);
+  }
 
   const [filterService, setFilterService] = useState('');
   const [filterStatus, setFilterStatus] = useState('');

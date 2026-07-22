@@ -384,6 +384,31 @@ services:
     networks:
       - edgesphere-net
 
+  websocket-gateway:
+    build:
+      context: ../../apps/websocket-gateway
+      dockerfile: Dockerfile
+    container_name: edgesphere-ws
+    restart: unless-stopped
+    environment:
+      PORT: "3006"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+      KAFKA_BROKER: kafka:9092
+      KAFKA_CLIENT_ID: websocket-gateway
+      KAFKA_GROUP_ID: websocket-group
+      NODE_ENV: development
+    ports:
+      - "3006:3006"
+    depends_on:
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks:
+      - edgesphere-net
+
   dashboard:
     build:
       context: ../../apps/dashboard
