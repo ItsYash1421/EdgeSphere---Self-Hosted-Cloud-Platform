@@ -7,6 +7,9 @@ export class MetricsService {
   private requestDuration: promClient.Histogram;
   private rateLimitHitsTotal: promClient.Counter;
   private upstreamErrorsTotal: promClient.Counter;
+  private dlqMessagesTotal: promClient.Counter;
+  private dlqRetrySuccessTotal: promClient.Counter;
+  private dlqPermanentFailureTotal: promClient.Counter;
 
   constructor() {
     promClient.collectDefaultMetrics();
@@ -34,6 +37,22 @@ export class MetricsService {
       help: 'Total number of upstream errors',
       labelNames: ['service'],
     });
+
+    this.dlqMessagesTotal = new promClient.Counter({
+      name: 'gateway_dlq_messages_total',
+      help: 'Total number of messages sent to DLQ',
+      labelNames: ['topic', 'reason'],
+    });
+
+    this.dlqRetrySuccessTotal = new promClient.Counter({
+      name: 'gateway_dlq_retry_success_total',
+      help: 'Total number of successfully retried DLQ messages',
+    });
+
+    this.dlqPermanentFailureTotal = new promClient.Counter({
+      name: 'gateway_dlq_permanent_failure_total',
+      help: 'Total number of permanently failed DLQ messages',
+    });
   }
 
   recordRequest(method: string, path: string, status: string, service: string) {
@@ -53,5 +72,17 @@ export class MetricsService {
 
   async getMetrics(): Promise<string> {
     return promClient.register.metrics();
+  }
+
+  recordDlqMessage(topic: string, reason: string) {
+    this.dlqMessagesTotal.labels(topic, reason).inc();
+  }
+
+  recordDlqRetrySuccess() {
+    this.dlqRetrySuccessTotal.inc();
+  }
+
+  recordDlqPermanentFailure() {
+    this.dlqPermanentFailureTotal.inc();
   }
 }

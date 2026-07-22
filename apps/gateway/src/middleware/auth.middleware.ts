@@ -2,12 +2,16 @@ import { Injectable, NestMiddleware } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 import { ConfigService } from '@nestjs/config';
 import * as jwt from 'jsonwebtoken';
+import { RateLimitService } from '../rate-limit/rate-limit.service';
 
 @Injectable()
 export class AuthMiddleware implements NestMiddleware {
-  constructor(private configService: ConfigService) {}
+  constructor(
+    private configService: ConfigService,
+    private rateLimitService: RateLimitService
+  ) {}
 
-  use(req: Request & { user?: any }, res: Response, next: NextFunction) {
+  async use(req: Request & { user?: any }, res: Response, next: NextFunction) {
     const authHeader = req.headers.authorization;
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -25,6 +29,22 @@ export class AuthMiddleware implements NestMiddleware {
       
       const payload = jwt.verify(token, secret);
       req.user = payload;
+      
+      // Apply Rate Limiting
+      const userId = (payload as any).sub || (payload as any).id || 'anonymous';
+      const limit = 100;
+      const rateLimitRes = await this.rateLimitService.slidingWindow(userId, limit);
+      
+      res.setHeader('X-RateLimit-Limit', limit.toString());
+      res.setHeader('X-RateLimit-Remaining', rateLimitRes.remaining.toString());
+      res.setHeader('X-RateLimit-Reset', Math.floor(rateLimitRes.resetAt.getTime() / 1000).toString());
+      
+      if (!rateLimitRes.allowed) {
+        const retryAfter = Math.ceil((rateLimitRes.resetAt.getTime() - Date.now()) / 1000);
+        res.setHeader('Retry-After', retryAfter.toString());
+        return res.status(429).json({ message: 'Too Many Requests' });
+      }
+
       next();
     } catch (error) {
       return res.status(401).json({ message: 'Unauthorized - Invalid token' });
