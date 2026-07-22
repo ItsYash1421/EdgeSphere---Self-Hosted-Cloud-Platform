@@ -5,6 +5,7 @@ import { CacheModule } from "./cache/cache.module";
 import { MetricsModule } from "./metrics/metrics.module";
 import { HealthModule } from "./health/health.module";
 import { GeoModule } from "./geo/geo.module";
+import { EventsModule } from "./events/events.module";
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { GeoModule } from "./geo/geo.module";
     GeoModule,
     CdnModule,
     HealthModule,
+    EventsModule,
   ],
 })
 export class AppModule {}

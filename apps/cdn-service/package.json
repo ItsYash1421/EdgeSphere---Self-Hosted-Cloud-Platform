@@ -26,6 +26,7 @@
     "node-cache": "^5.1.0",
     "mime-types": "^2.1.35",
     "uuid": "^10.0.0",
+    "kafkajs": "^2.2.0",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.0.0"
   },
