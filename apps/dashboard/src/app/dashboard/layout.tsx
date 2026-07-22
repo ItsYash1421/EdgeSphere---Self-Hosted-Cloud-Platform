@@ -7,6 +7,7 @@ import Link from 'next/link';
 const NAV_ITEMS = [
   { label: 'Overview', href: '/dashboard', icon: '◈', section: 'main' },
   { label: 'Storage', href: '/dashboard/storage', icon: '🗄️', section: 'main' },
+  { label: 'CDN', href: '/dashboard/cdn', icon: '🌐', section: 'main' },
   { label: 'API Keys', href: '/dashboard/api-keys', icon: '🔑', section: 'main' },
   { label: 'Analytics', href: '/dashboard/analytics', icon: '📊', section: 'observe', badge: 'Live' },
   { label: 'Edge Servers', href: '/dashboard/edges', icon: '⚡', section: 'observe' },

@@ -35,6 +35,21 @@ scrape_configs:
       - targets: ['edge-server-b:8081']
     metrics_path: '/metrics'
 
+  - job_name: 'cdn-service-a'
+    static_configs:
+      - targets: ['cdn-service-a:8080']
+    metrics_path: '/metrics'
+
+  - job_name: 'cdn-service-b'
+    static_configs:
+      - targets: ['cdn-service-b:8081']
+    metrics_path: '/metrics'
+
+  - job_name: 'cache-service'
+    static_configs:
+      - targets: ['cache-service:3004']
+    metrics_path: '/metrics'
+
   - job_name: 'minio'
     static_configs:
       - targets: ['minio:9000']

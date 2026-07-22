@@ -288,6 +288,78 @@ services:
     networks:
       - edgesphere-net
 
+  # CDN Service (Node.js — replaces Go edge servers)
+  cdn-service-a:
+    build:
+      context: ../../apps/cdn-service
+      dockerfile: Dockerfile
+    container_name: edgesphere-cdn-a
+    restart: unless-stopped
+    environment:
+      PORT: "8080"
+      EDGE_REGION: us-east-1
+      ORIGIN_URL: http://storage-service:3002
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+      CACHE_TTL_SECONDS: "3600"
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-internal-secret-change-me}
+      NODE_ENV: development
+    ports:
+      - "8080:8080"
+    depends_on:
+      redis:
+        condition: service_healthy
+      storage-service:
+        condition: service_started
+    networks:
+      - edgesphere-net
+
+  cdn-service-b:
+    build:
+      context: ../../apps/cdn-service
+      dockerfile: Dockerfile
+    container_name: edgesphere-cdn-b
+    restart: unless-stopped
+    environment:
+      PORT: "8081"
+      EDGE_REGION: eu-west-1
+      ORIGIN_URL: http://storage-service:3002
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+      CACHE_TTL_SECONDS: "3600"
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-internal-secret-change-me}
+      NODE_ENV: development
+    ports:
+      - "8081:8081"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - edgesphere-net
+
+  cache-service:
+    build:
+      context: ../../apps/cache-service
+      dockerfile: Dockerfile
+    container_name: edgesphere-cache
+    restart: unless-stopped
+    environment:
+      PORT: "3004"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-internal-secret-change-me}
+      NODE_ENV: development
+    ports:
+      - "3004:3004"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - edgesphere-net
+
   dashboard:
     build:
       context: ../../apps/dashboard
