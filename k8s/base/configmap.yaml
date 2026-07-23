@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: edgesphere-config
+  namespace: edgesphere
+data:
+  NODE_ENV: "production"
+  LOG_LEVEL: "info"
+  REDIS_HOST: "redis-service"
+  REDIS_PORT: "6379"
+  DB_HOST: "postgres-service"
+  DB_PORT: "5432"
+  DB_NAME: "edgesphere"
+  KAFKA_BROKER: "kafka-service:9092"
+  AUTH_SERVICE_URL: "http://auth-service:3001"
+  STORAGE_SERVICE_URL: "http://storage-service:3002"
+  ANALYTICS_SERVICE_URL: "http://analytics-service:3003"
+  CDN_SERVICE_URL: "http://cdn-service-a:8080"
+  CACHE_SERVICE_URL: "http://cache-service:3004"
+  ORIGIN_URL: "http://storage-service:3002"
+  EDGE_REGION: "us-east-1"
+  CACHE_TTL_SECONDS: "3600"
+  RATE_LIMIT_MAX: "1000"
+  RATE_LIMIT_WINDOW_MS: "60000"

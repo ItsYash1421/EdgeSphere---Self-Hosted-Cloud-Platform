@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cdn-service-a
+  namespace: edgesphere
+  labels:
+    app: cdn-service-a
+    version: v1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cdn-service-a
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: cdn-service-a
+        version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+      - name: cdn-service-a
+        image: ghcr.io/your-org/edgesphere-cdn-service-a:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          name: http
+        envFrom:
+        - configMapRef:
+            name: edgesphere-config
+        - secretRef:
+            name: edgesphere-secrets
+        resources:
+          requests: { cpu: 200m, memory: 256Mi }
+          limits: { cpu: 1000m, memory: 512Mi }
+        readinessProbe:
+          httpGet: { path: /health, port: 8080 }
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          failureThreshold: 3
+        livenessProbe:
+          httpGet: { path: /health, port: 8080 }
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          failureThreshold: 3
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "sleep 5"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cdn-service-a
+  namespace: edgesphere
+  labels: { app: cdn-service-a }
+spec:
+  selector: { app: cdn-service-a }
+  ports:
+  - port: 8080
+    targetPort: 8080
+    name: http
