@@ -95,4 +95,4 @@ export class KafkaConsumerService implements OnModuleInit, OnModuleDestroy {
   getConsumer(): Consumer {
     return this.consumer;
   }
-}\n
+}

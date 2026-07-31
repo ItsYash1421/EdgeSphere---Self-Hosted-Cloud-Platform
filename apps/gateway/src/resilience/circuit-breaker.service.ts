@@ -14,7 +14,7 @@ export class CircuitBreakerService implements OnModuleInit {
   private readonly logger = new Logger(CircuitBreakerService.name);
   private breakers = new Map<string, CircuitBreaker>();
 
-  createBreaker(serviceName: string, fn: Function): CircuitBreaker {
+  createBreaker(serviceName: string, fn: (...args: any[]) => Promise<any>): CircuitBreaker {
     const options: CircuitBreaker.Options = {
       timeout: 3000,
       errorThresholdPercentage: 50,
@@ -35,24 +35,14 @@ export class CircuitBreakerService implements OnModuleInit {
   async execute<T>(serviceName: string, fn: () => Promise<T>): Promise<T> {
     let breaker = this.breakers.get(serviceName);
     if (!breaker) {
-      breaker = this.createBreaker(serviceName, fn);
-    } else {
-      // In a real implementation we might replace the function inside the breaker or 
-      // rely on the caller to provide a generic wrapper.
-      // Opossum doesn't let you just swap out the function for an existing breaker execution directly without using the underlying function context or binding.
-      // A common pattern is to have the breaker created for a generic executor.
+      // Create a dummy wrapper if it doesn't exist
+      breaker = this.createBreaker(serviceName, async (f: () => Promise<any>) => f());
     }
 
     try {
-      // Since opossum executes the function it was created with, and we want to pass a generic function 
-      // here to execute, we might need to adjust. Wait, if we create the breaker with a generic function:
-      // const genericFn = (fn) => fn();
-      // breaker = new CircuitBreaker(genericFn, options);
-      // await breaker.fire(fn);
-      // Let's refactor this slightly internally to support this execute pattern.
       return await breaker.fire(fn) as T;
     } catch (error: any) {
-      if (error.code === 'EOPENBREAKER' || error.message.includes('Breaker is open')) {
+      if (error.code === 'EOPENBREAKER' || (error.message && error.message.includes('Breaker is open'))) {
         throw new ServiceUnavailableException({
           message: `Service ${serviceName} is unavailable`,
           retryAfter: 30
@@ -100,7 +90,7 @@ export class CircuitBreakerService implements OnModuleInit {
     const services = ['auth-service', 'storage-service', 'analytics-service', 'cdn-service', 'cache-service'];
     
     // We create generic breakers that take a function and execute it
-    const executor = async (fn: Function) => {
+    const executor = async (fn: (...args: any[]) => Promise<any>) => {
       return await fn();
     };
 

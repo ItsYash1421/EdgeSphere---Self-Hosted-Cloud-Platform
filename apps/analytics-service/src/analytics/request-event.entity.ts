@@ -17,4 +17,4 @@ export class RequestEventEntity {
   @Column({ type: 'bigint', default: 0 }) bytes: number;
   @Column({ name: 'edge_region', nullable: true }) edgeRegion: string;
   @Column({ name: 'request_id', type: 'uuid', generated: 'uuid' }) requestId: string;
-}\n
+}

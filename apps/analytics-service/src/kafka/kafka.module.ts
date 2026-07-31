@@ -8,4 +8,4 @@ import { AnalyticsModule } from '../analytics/analytics.module';
   providers: [KafkaConsumerService, KafkaProducerService],
   exports: [KafkaProducerService],
 })
-export class KafkaModule {}\n
+export class KafkaModule {}

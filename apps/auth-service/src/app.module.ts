@@ -5,7 +5,6 @@ import { JwtModule } from '@nestjs/jwt';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
-import { ApiKeysModule } from './api-keys/api-keys.module';
 import { HealthModule } from './health/health.module';
 import { MetricsModule } from './metrics/metrics.module';
 
@@ -54,7 +53,6 @@ import { MetricsModule } from './metrics/metrics.module';
     // ─── Feature Modules ────────────────────────────────────────
     AuthModule,
     UsersModule,
-    ApiKeysModule,
     HealthModule,
     MetricsModule,
   ],

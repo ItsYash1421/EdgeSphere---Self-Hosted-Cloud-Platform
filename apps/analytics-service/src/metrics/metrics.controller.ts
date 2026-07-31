@@ -11,4 +11,4 @@ export class MetricsController {
     res.set('Content-Type', 'text/plain');
     res.send(await this.metricsService.getMetrics());
   }
-}\n
+}

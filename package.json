@@ -11,6 +11,7 @@
     "pnpm": ">=9.0.0"
   },
   "scripts": {
+    "Edsphere": "bash scripts/start.sh",
     "dev": "docker compose -f infra/docker/docker-compose.dev.yml up --build",
     "dev:services": "pnpm -r --parallel run dev",
     "build": "pnpm -r run build",

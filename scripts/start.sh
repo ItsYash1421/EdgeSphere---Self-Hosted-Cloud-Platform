@@ -35,15 +35,23 @@ usage() {
 start_infra() {
   echo -e "${YELLOW}→ Starting infrastructure services...${NC}"
   docker compose -f $COMPOSE_FILE up -d \
-    postgres redis minio kafka zookeeper \
+    postgres redis minio kafka \
     prometheus grafana jaeger loki
   echo -e "${GREEN}✓ Infrastructure started${NC}"
 }
 
 start_apps() {
+  echo -e "${YELLOW}→ Ensuring application services are built sequentially to avoid network overload...${NC}"
+  APPS=("auth-service" "api-gateway" "storage-service" "analytics-service" "cache-service" "cdn-service-a" "cdn-service-b" "notification-service" "websocket-gateway" "dashboard")
+  
+  for app in "${APPS[@]}"; do
+    echo -e "${CYAN}Checking/Building ${app}...${NC}"
+    docker compose -f $COMPOSE_FILE build $app
+  done
+
   echo -e "${YELLOW}→ Starting application services...${NC}"
   docker compose -f $COMPOSE_FILE up -d \
-    auth-service gateway storage-service \
+    auth-service api-gateway storage-service \
     analytics-service cache-service cdn-service-a cdn-service-b \
     notification-service websocket-gateway dashboard
   echo -e "${GREEN}✓ Applications started${NC}"

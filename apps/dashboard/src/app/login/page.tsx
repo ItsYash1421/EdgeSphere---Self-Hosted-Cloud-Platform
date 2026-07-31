@@ -19,7 +19,7 @@ export default function LoginPage() {
 
     try {
       const endpoint = mode === 'login' ? '/v1/auth/login' : '/v1/auth/register';
-      const data = await api.post(endpoint, { email, password });
+      const data = await api.post<{ accessToken: string; refreshToken: string }>(endpoint, { email, password });
       localStorage.setItem('access_token', data.accessToken);
       localStorage.setItem('refresh_token', data.refreshToken);
       router.replace('/dashboard');

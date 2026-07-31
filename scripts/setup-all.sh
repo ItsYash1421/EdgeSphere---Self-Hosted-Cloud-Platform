@@ -123,13 +123,13 @@ info "Waiting for Kafka to start (30 seconds)..."
 sleep 30
 
 # Check Kafka is up
-docker exec edgesphere-kafka kafka-topics.sh --list --bootstrap-server localhost:9092 > /dev/null 2>&1 || {
+docker exec edgesphere-kafka /opt/kafka/bin/kafka-topics.sh --list --bootstrap-server localhost:9092 > /dev/null 2>&1 || {
   info "Kafka not ready yet, waiting 15 more seconds..."
   sleep 15
 }
 
 info "Creating Kafka topics..."
-KAFKA_CMD="docker exec edgesphere-kafka kafka-topics.sh --bootstrap-server localhost:9092"
+KAFKA_CMD="docker exec edgesphere-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092"
 
 for topic in request.events storage.events alerts.triggered system.events request.events.dlq storage.events.dlq; do
   $KAFKA_CMD --create --if-not-exists --topic "$topic" \

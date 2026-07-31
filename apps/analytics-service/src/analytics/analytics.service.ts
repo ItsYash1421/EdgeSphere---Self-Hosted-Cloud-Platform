@@ -221,4 +221,4 @@ export class AnalyticsService {
     const result = await this.repository.query(query, [limit]);
     return result;
   }
-}\n
+}

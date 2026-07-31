@@ -42,4 +42,4 @@ export class MetricsService implements OnModuleInit {
   getMetrics(): Promise<string> {
     return this.registry.metrics();
   }
-}\n
+}

@@ -51,4 +51,4 @@ export class RequestEventDto {
   bytes?: number;
   edgeRegion?: string;
   requestId?: string;
-}\n
+}

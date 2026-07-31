@@ -16,6 +16,9 @@
     "noImplicitAny": false,
     "strictBindCallApply": false,
     "forceConsistentCasingInFileNames": false,
-    "noFallbackArgs": false
+    "noFallbackArgs": false,
+    "moduleResolution": "node",
+    "strictPropertyInitialization": false,
+    "paths": {}
   }
 }

@@ -1,6 +1,5 @@
 'use client';
 import { useRealtimeMetrics } from '../hooks/useRealtimeMetrics';
-import '../styles/realtime.css'; // Assuming we create a basic CSS file, or inline styles
 
 export function RealtimeIndicator() {
   const { metrics, connected } = useRealtimeMetrics();

@@ -84,4 +84,4 @@ export class AnalyticsController {
   health() {
     return { status: 'ok' };
   }
-}\n
+}

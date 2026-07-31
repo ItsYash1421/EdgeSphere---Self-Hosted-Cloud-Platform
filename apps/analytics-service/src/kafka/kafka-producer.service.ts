@@ -58,4 +58,4 @@ export class KafkaProducerService implements OnModuleInit, OnModuleDestroy {
       throw error;
     }
   }
-}\n
+}

@@ -6,4 +6,4 @@ import { TypeOrmModule } from '@nestjs/typeorm';
   imports: [TypeOrmModule.forFeature([])],
   controllers: [HealthController],
 })
-export class HealthModule {}\n
+export class HealthModule {}

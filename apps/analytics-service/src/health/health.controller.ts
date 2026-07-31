@@ -29,4 +29,4 @@ export class HealthController {
       uptime: Math.floor((Date.now() - this.startTime) / 1000),
     };
   }
-}\n
+}

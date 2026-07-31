@@ -26,12 +26,15 @@
     "kafkajs": "^2.2.0",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.0.0",
-    "opossum": "^8.0.0"
+    "opossum": "^8.0.0",
+    "axios": "^1.6.0",
+    "@nestjs/axios": "^3.0.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.0.0",
     "@types/jsonwebtoken": "^9.0.0",
     "@types/node": "^22.0.0",
+    "@types/express": "^4.17.21",
     "@types/uuid": "^10.0.0",
     "typescript": "^5.5.0",
     "@types/opossum": "^8.0.0"

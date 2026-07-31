@@ -10,4 +10,4 @@ import { AnalyticsController } from './analytics.controller';
   controllers: [AnalyticsController],
   exports: [AnalyticsService],
 })
-export class AnalyticsModule {}\n
+export class AnalyticsModule {}

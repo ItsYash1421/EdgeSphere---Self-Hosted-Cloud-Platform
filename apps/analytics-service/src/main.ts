@@ -23,4 +23,4 @@ async function bootstrap() {
   await app.listen(port);
   Logger.log(`Analytics Service is running on: http://localhost:${port}`, 'Bootstrap');
 }
-bootstrap();\n
+bootstrap();

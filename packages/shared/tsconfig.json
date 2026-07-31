@@ -4,10 +4,9 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "moduleResolution": "node",
-    "strictPropertyInitialization": false,
-    "paths": {}
+    "module": "commonjs",
+    "target": "ES2021",
+    "declaration": true
   },
-  "include": [
-    "src/**/*"
-  ]
+  "include": ["src/**/*"]
 }

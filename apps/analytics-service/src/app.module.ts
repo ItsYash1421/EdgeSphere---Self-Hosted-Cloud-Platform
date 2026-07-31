@@ -33,4 +33,4 @@ import { RequestEventEntity } from './analytics/request-event.entity';
     HealthModule,
   ],
 })
-export class AppModule {}\n
+export class AppModule {}
