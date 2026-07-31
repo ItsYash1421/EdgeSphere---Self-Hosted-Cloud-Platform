@@ -3,12 +3,11 @@
 import { useState } from 'react';
 import useSWR, { mutate } from 'swr';
 
-const NOTIF_BASE = process.env.NEXT_PUBLIC_API_URL + '/notifications';
+import api from '@/lib/api';
 
-const fetcher = (url: string) => {
-  const token = localStorage.getItem('access_token');
-  return fetch(url, { headers: { Authorization: `Bearer ${token}` } }).then(res => res.json());
-};
+const NOTIF_BASE = '/v1/notifications';
+
+const fetcher = (url: string) => api.get(url);
 
 export default function AlertsPage() {
   const { data: rulesData } = useSWR(`${NOTIF_BASE}/alerts/rules`, fetcher, { refreshInterval: 10000 });
@@ -18,47 +17,29 @@ export default function AlertsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form, setForm] = useState({ name: '', condition: 'error_rate_above', threshold: 5, window: 5, channels: { email: true, webhook: false, slack: false } });
 
-  const rules = rulesData?.data || [];
-  const aHistory = alertHistory?.data || [];
-  const nHistory = notifHistory?.data || [];
+  const rules: any[] = Array.isArray(rulesData) ? rulesData : [];
+  const aHistory: any[] = Array.isArray(alertHistory) ? alertHistory : [];
+  const nHistory: any[] = Array.isArray(notifHistory) ? notifHistory : [];
 
   const handleCreateRule = async (e: React.FormEvent) => {
     e.preventDefault();
-    const token = localStorage.getItem('access_token');
-    await fetch(`${NOTIF_BASE}/alerts/rules`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify(form)
-    });
+    await api.post(`${NOTIF_BASE}/alerts/rules`, form);
     setIsModalOpen(false);
     mutate(`${NOTIF_BASE}/alerts/rules`);
   };
 
   const handleToggleRule = async (id: string, enabled: boolean) => {
-    const token = localStorage.getItem('access_token');
-    await fetch(`${NOTIF_BASE}/alerts/rules/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ enabled: !enabled })
-    });
+    await api.patch(`${NOTIF_BASE}/alerts/rules/${id}`, { enabled: !enabled });
     mutate(`${NOTIF_BASE}/alerts/rules`);
   };
 
   const handleDeleteRule = async (id: string) => {
-    const token = localStorage.getItem('access_token');
-    await fetch(`${NOTIF_BASE}/alerts/rules/${id}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    await api.delete(`${NOTIF_BASE}/alerts/rules/${id}`);
     mutate(`${NOTIF_BASE}/alerts/rules`);
   };
 
   const handleTestNotification = async () => {
-    const token = localStorage.getItem('access_token');
-    await fetch(`${NOTIF_BASE}/test`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    await api.post(`${NOTIF_BASE}/test`);
     alert('Test notification triggered!');
   };
 

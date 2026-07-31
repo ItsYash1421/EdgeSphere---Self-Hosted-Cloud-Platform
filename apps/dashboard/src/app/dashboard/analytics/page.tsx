@@ -7,12 +7,11 @@ import {
   PieChart, Pie, Cell, LineChart, Line
 } from 'recharts';
 
-const BASE = process.env.NEXT_PUBLIC_API_URL + '/analytics';
+import api from '@/lib/api';
 
-const fetcher = (url: string) => {
-  const token = localStorage.getItem('access_token');
-  return fetch(url, { headers: { Authorization: `Bearer ${token}` } }).then(res => res.json());
-};
+const BASE = '/v1/analytics';
+
+const fetcher = (url: string): Promise<any> => api.get<any>(url);
 
 const TOOLTIP_STYLE = {
   backgroundColor: 'var(--bg-surface)',
@@ -34,17 +33,17 @@ export default function AnalyticsPage() {
   const { data: pathsData } = useSWR(`${BASE}/requests/top-paths?window=${windowTime}`, fetcher, { refreshInterval: 30000 });
   const { data: errorData } = useSWR(`${BASE}/errors?window=${windowTime}`, fetcher, { refreshInterval: 15000 });
 
-  const summary = summaryData?.data || { requests: 0, cacheHitRate: 0, p95Latency: 0, bandwidth: 0, errorRate: 0 };
-  const rateSeries = rateData?.data || [];
-  const latencySeries = latencyData?.data || [];
-  const cacheRatio = cacheData?.data || { hit: 0, miss: 0 };
-  const geoStats = geoData?.data || [];
-  const topPaths = pathsData?.data || [];
-  const errors = errorData?.data || [];
+  const summary: any = summaryData || { totalRequests: 0, cacheHitRatio: 0, p95Latency: 0, totalBandwidthBytes: 0, errorRate: 0 };
+  const rateSeries = Array.isArray(rateData) ? rateData : [];
+  const latencySeries = latencyData ? [{ t: new Date().toISOString(), ...latencyData }] : [];
+  const cacheRatio: any = cacheData || { hits: 0, misses: 0, hitRatio: 0 };
+  const geoStats = Array.isArray(geoData) ? geoData : [];
+  const topPaths = Array.isArray(pathsData) ? pathsData : [];
+  const errors = Array.isArray(errorData) ? errorData : [];
 
   const PIE_DATA = [
-    { name: 'Cache Hit', value: Math.round(cacheRatio.hit), color: '#22c55e' },
-    { name: 'Cache Miss', value: Math.round(cacheRatio.miss), color: '#ef4444' }
+    { name: 'Cache Hit', value: cacheRatio.hits || 0, color: '#22c55e' },
+    { name: 'Cache Miss', value: cacheRatio.misses || 0, color: '#ef4444' }
   ];
 
   return (
@@ -81,11 +80,11 @@ export default function AnalyticsPage() {
       {/* KPI Row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 14, marginBottom: 24 }}>
         {[
-          { label: 'Total Requests', value: summary.requests.toLocaleString(), color: 'var(--brand)' },
-          { label: 'Cache Hit Rate', value: `${summary.cacheHitRate.toFixed(1)}%`, color: 'var(--green)' },
+          { label: 'Total Requests', value: summary.totalRequests.toLocaleString(), color: 'var(--brand)' },
+          { label: 'Cache Hit Rate', value: `${(summary.cacheHitRatio * 100).toFixed(1)}%`, color: 'var(--green)' },
           { label: 'P95 Latency', value: `${Math.round(summary.p95Latency)}ms`, color: 'var(--blue)' },
-          { label: 'Bandwidth', value: `${(summary.bandwidth / (1024*1024)).toFixed(2)} MB`, color: 'var(--yellow)' },
-          { label: 'Error Rate', value: `${summary.errorRate.toFixed(2)}%`, color: 'var(--red)' },
+          { label: 'Bandwidth', value: `${(summary.totalBandwidthBytes / (1024*1024)).toFixed(2)} MB`, color: 'var(--yellow)' },
+          { label: 'Error Rate', value: `${(summary.errorRate * 100).toFixed(2)}%`, color: 'var(--red)' },
         ].map(kpi => (
           <div key={kpi.label} style={{
             background: 'var(--bg-surface)', border: '1px solid var(--border)',
@@ -119,10 +118,10 @@ export default function AnalyticsPage() {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis dataKey="time" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} />
+              <XAxis dataKey="t" tickFormatter={(t) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} />
               <YAxis tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} />
-              <Tooltip contentStyle={TOOLTIP_STYLE} />
-              <Area type="monotone" dataKey="requests" stroke="#6366f1" strokeWidth={2} fill="url(#reqG)" name="Requests" />
+              <Tooltip contentStyle={TOOLTIP_STYLE} labelFormatter={(l) => new Date(l).toLocaleTimeString()} />
+              <Area type="monotone" dataKey="value" stroke="#6366f1" strokeWidth={2} fill="url(#reqG)" name="Requests" />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -165,7 +164,7 @@ export default function AnalyticsPage() {
           <ResponsiveContainer width="100%" height={180}>
             <LineChart data={latencySeries}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis dataKey="time" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} />
+              <XAxis dataKey="t" tickFormatter={(t) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} />
               <YAxis tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} />
               <Tooltip contentStyle={TOOLTIP_STYLE} />
               <Line type="monotone" dataKey="p50" stroke="#22c55e" strokeWidth={2} dot={false} name="P50" />

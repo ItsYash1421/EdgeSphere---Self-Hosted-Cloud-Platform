@@ -12,6 +12,10 @@ export class AuthMiddleware implements NestMiddleware {
   ) {}
 
   async use(req: Request & { user?: any }, res: Response, next: NextFunction) {
+    if (req.method === 'OPTIONS') {
+      return next();
+    }
+
     const authHeader = req.headers.authorization;
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {

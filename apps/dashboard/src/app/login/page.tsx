@@ -2,10 +2,14 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useDispatch } from 'react-redux';
+import { setCredentials } from '../../store/slices/authSlice';
 import api from '@/lib/api';
+import { Zap, Globe, Database, Shield, Activity, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
+  const dispatch = useDispatch();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -20,8 +24,16 @@ export default function LoginPage() {
     try {
       const endpoint = mode === 'login' ? '/v1/auth/login' : '/v1/auth/register';
       const data = await api.post<{ accessToken: string; refreshToken: string }>(endpoint, { email, password });
-      localStorage.setItem('access_token', data.accessToken);
-      localStorage.setItem('refresh_token', data.refreshToken);
+      
+      // Decode user info from JWT
+      const payload = JSON.parse(atob(data.accessToken.split('.')[1]));
+      
+      dispatch(setCredentials({
+        user: { email: payload.email, role: payload.role },
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken
+      }));
+      
       router.replace('/dashboard');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Authentication failed';
@@ -43,26 +55,31 @@ export default function LoginPage() {
         {/* Left: Branding */}
         <div className="login-brand">
           <div className="login-brand-logo">
-            <span>⚡</span>
+            <Zap size={28} color="white" />
           </div>
           <h1 className="login-brand-name">EdgeSphere</h1>
-          <p className="login-brand-tagline">Your cloud infrastructure, your rules.</p>
+          <p className="login-brand-tagline">Enterprise-grade cloud infrastructure.</p>
 
           <div className="login-features">
             {[
-              { icon: '🌐', title: 'Global CDN', desc: 'Edge servers with Redis caching' },
-              { icon: '🗄️', title: 'Object Storage', desc: 'S3-compatible with presigned URLs' },
-              { icon: '⚡', title: 'API Gateway', desc: 'JWT auth + rate limiting + routing' },
-              { icon: '📊', title: 'Analytics', desc: 'Real-time metrics and logs' },
-            ].map((f) => (
-              <div key={f.title} className="login-feature-item">
-                <span className="login-feature-icon">{f.icon}</span>
-                <div>
-                  <div className="login-feature-title">{f.title}</div>
-                  <div className="login-feature-desc">{f.desc}</div>
+              { icon: Globe, title: 'Global CDN', desc: 'Edge servers with high-performance caching' },
+              { icon: Database, title: 'Object Storage', desc: 'S3-compatible with fine-grained access' },
+              { icon: Shield, title: 'API Gateway', desc: 'Secure JWT auth, rate limiting & routing' },
+              { icon: Activity, title: 'Real-time Analytics', desc: 'Deep observability and metrics' },
+            ].map((f) => {
+              const Icon = f.icon;
+              return (
+                <div key={f.title} className="login-feature-item">
+                  <span className="login-feature-icon">
+                    <Icon size={18} />
+                  </span>
+                  <div>
+                    <div className="login-feature-title">{f.title}</div>
+                    <div className="login-feature-desc">{f.desc}</div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="login-stack-badges">
@@ -76,21 +93,23 @@ export default function LoginPage() {
         <div className="login-form-container">
           <div className="login-card">
             <div className="login-card-header">
-              <div className="login-card-icon">⚡</div>
+              <div className="login-card-icon">
+                <Zap size={28} className="text-brand" />
+              </div>
               <h2 className="login-card-title">
-                {mode === 'login' ? 'Welcome back' : 'Create account'}
+                {mode === 'login' ? 'Sign in to EdgeSphere' : 'Create an account'}
               </h2>
               <p className="login-card-subtitle">
                 {mode === 'login'
-                  ? 'Sign in to your EdgeSphere dashboard'
-                  : 'Start building with EdgeSphere today'}
+                  ? 'Access your unified cloud management console.'
+                  : 'Start building globally distributed applications.'}
               </p>
             </div>
 
             {error && (
               <div className="login-error">
-                <span>⚠️</span>
-                {error}
+                <AlertCircle size={16} />
+                <span>{error}</span>
               </div>
             )}
 
@@ -131,29 +150,32 @@ export default function LoginPage() {
               >
                 {loading ? (
                   <>
-                    <span className="spinner" />
-                    {mode === 'login' ? 'Signing in...' : 'Creating account...'}
+                    <Loader2 size={16} className="spinner" />
+                    {mode === 'login' ? 'Authenticating...' : 'Creating account...'}
                   </>
                 ) : (
-                  mode === 'login' ? '→ Sign In' : '→ Create Account'
+                  <>
+                    {mode === 'login' ? 'Sign In' : 'Create Account'}
+                    <ArrowRight size={16} />
+                  </>
                 )}
               </button>
             </form>
 
             <div className="login-divider">
-              <span>or</span>
+              <span>OR</span>
             </div>
 
             <button
               className="btn btn-secondary w-full"
               onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); }}
             >
-              {mode === 'login' ? "Don't have an account? Register" : 'Already have an account? Sign in'}
+              {mode === 'login' ? "Create a new account" : 'Sign in to an existing account'}
             </button>
 
             {mode === 'login' && (
               <p className="login-demo-hint">
-                Demo: <code>admin@edgesphere.local</code> / <code>admin123</code>
+                Demo access: <code>admin@edgesphere.local</code> / <code>admin123</code>
               </p>
             )}
           </div>
@@ -181,7 +203,7 @@ export default function LoginPage() {
           left: -100px;
           width: 600px;
           height: 600px;
-          background: radial-gradient(circle, rgba(99, 102, 241, 0.12) 0%, transparent 70%);
+          background: radial-gradient(circle, var(--brand-glow) 0%, transparent 70%);
         }
 
         .login-glow-2 {
@@ -190,16 +212,17 @@ export default function LoginPage() {
           right: -100px;
           width: 500px;
           height: 500px;
-          background: radial-gradient(circle, rgba(167, 139, 250, 0.08) 0%, transparent 70%);
+          background: radial-gradient(circle, rgba(0,161,201,0.08) 0%, transparent 70%);
         }
 
         .login-grid {
           position: absolute;
           inset: 0;
           background-image:
-            linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+            linear-gradient(var(--border) 1px, transparent 1px),
+            linear-gradient(90deg, var(--border) 1px, transparent 1px);
           background-size: 40px 40px;
+          opacity: 0.3;
         }
 
         .login-container {
@@ -217,29 +240,26 @@ export default function LoginPage() {
           flex-direction: column;
           justify-content: center;
           border-right: 1px solid var(--border);
-          background: linear-gradient(135deg, rgba(99,102,241,0.04) 0%, transparent 60%);
+          background: linear-gradient(135deg, var(--bg-elevated) 0%, transparent 60%);
         }
 
         .login-brand-logo {
-          width: 56px;
-          height: 56px;
+          width: 48px;
+          height: 48px;
           background: linear-gradient(135deg, var(--brand), var(--brand-dark));
-          border-radius: 14px;
+          border-radius: var(--radius-sm);
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 28px;
-          box-shadow: 0 0 40px rgba(99,102,241,0.35);
-          margin-bottom: 20px;
+          box-shadow: var(--shadow-brand);
+          margin-bottom: 24px;
         }
 
         .login-brand-name {
-          font-size: 36px;
+          font-size: 32px;
           font-weight: 800;
-          letter-spacing: -1.5px;
-          background: linear-gradient(135deg, #f0f2f5, var(--brand-light));
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
+          letter-spacing: -1px;
+          color: var(--text-primary);
           margin-bottom: 8px;
         }
 
@@ -252,56 +272,59 @@ export default function LoginPage() {
         .login-features {
           display: flex;
           flex-direction: column;
-          gap: 16px;
-          margin-bottom: 32px;
+          gap: 20px;
+          margin-bottom: 40px;
         }
 
         .login-feature-item {
           display: flex;
           align-items: flex-start;
-          gap: 12px;
+          gap: 16px;
         }
 
         .login-feature-icon {
-          font-size: 18px;
+          color: var(--brand);
           margin-top: 2px;
           flex-shrink: 0;
         }
 
         .login-feature-title {
-          font-size: 13.5px;
+          font-size: 14px;
           font-weight: 600;
           color: var(--text-primary);
         }
 
         .login-feature-desc {
-          font-size: 12.5px;
+          font-size: 13px;
           color: var(--text-muted);
         }
 
         .login-stack-badges {
           display: flex;
           flex-wrap: wrap;
-          gap: 6px;
+          gap: 8px;
         }
 
         .stack-badge {
           font-size: 11px;
-          font-weight: 500;
-          padding: 3px 10px;
-          border-radius: 20px;
-          background: var(--bg-elevated);
+          font-weight: 600;
+          padding: 4px 10px;
+          border-radius: var(--radius-md);
+          background: var(--bg-overlay);
           color: var(--text-secondary);
           border: 1px solid var(--border);
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
         }
 
         .login-form-container {
-          width: 480px;
+          width: 500px;
           display: flex;
           align-items: center;
           justify-content: center;
           padding: 40px;
           flex-shrink: 0;
+          background: var(--bg-surface);
         }
 
         .login-card {
@@ -310,70 +333,51 @@ export default function LoginPage() {
         }
 
         .login-card-header {
-          text-align: center;
-          margin-bottom: 28px;
+          margin-bottom: 32px;
         }
 
         .login-card-icon {
-          font-size: 28px;
-          margin-bottom: 12px;
+          margin-bottom: 16px;
+          color: var(--brand);
         }
 
         .login-card-title {
-          font-size: 22px;
+          font-size: 24px;
           font-weight: 700;
           letter-spacing: -0.5px;
           color: var(--text-primary);
-          margin-bottom: 6px;
+          margin-bottom: 8px;
         }
 
         .login-card-subtitle {
-          font-size: 13.5px;
+          font-size: 14px;
           color: var(--text-secondary);
         }
 
         .login-error {
           background: var(--red-bg);
-          border: 1px solid rgba(239,68,68,0.2);
+          border: 1px solid rgba(209, 50, 18, 0.2);
           border-radius: var(--radius-sm);
-          padding: 10px 14px;
+          padding: 12px 16px;
           font-size: 13px;
           color: var(--red);
           display: flex;
           align-items: center;
-          gap: 8px;
-          margin-bottom: 16px;
+          gap: 10px;
+          margin-bottom: 24px;
+          font-weight: 500;
         }
 
-        .login-form { margin-bottom: 16px; }
+        .login-form { margin-bottom: 24px; }
 
         .login-submit {
           height: 44px;
           font-size: 14px;
-          font-weight: 600;
-          letter-spacing: 0.2px;
           justify-content: center;
-          background: linear-gradient(135deg, var(--brand), var(--brand-dark));
-          transition: all 0.2s;
-        }
-
-        .login-submit:hover:not(:disabled) {
-          transform: translateY(-1px);
-          box-shadow: 0 6px 24px rgba(99,102,241,0.45);
-        }
-
-        .login-submit.loading {
-          opacity: 0.8;
         }
 
         .spinner {
-          width: 14px;
-          height: 14px;
-          border: 2px solid rgba(255,255,255,0.3);
-          border-top-color: white;
-          border-radius: 50%;
-          animation: spin 0.7s linear infinite;
-          display: inline-block;
+          animation: spin 1s linear infinite;
         }
 
         @keyframes spin { to { transform: rotate(360deg); } }
@@ -381,9 +385,11 @@ export default function LoginPage() {
         .login-divider {
           text-align: center;
           position: relative;
-          margin: 16px 0;
+          margin: 24px 0;
           color: var(--text-muted);
-          font-size: 12px;
+          font-size: 11px;
+          font-weight: 600;
+          letter-spacing: 1px;
         }
 
         .login-divider::before {
@@ -396,15 +402,15 @@ export default function LoginPage() {
 
         .login-divider span {
           position: relative;
-          background: var(--bg-base);
+          background: var(--bg-surface);
           padding: 0 12px;
         }
 
         .login-demo-hint {
           text-align: center;
-          font-size: 11.5px;
+          font-size: 12px;
           color: var(--text-muted);
-          margin-top: 16px;
+          margin-top: 24px;
         }
 
         @media (max-width: 900px) {

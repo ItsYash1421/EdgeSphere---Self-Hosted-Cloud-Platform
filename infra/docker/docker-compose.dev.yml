@@ -193,6 +193,8 @@ services:
       AUTH_SERVICE_URL: http://edgesphere-auth:3001
       STORAGE_SERVICE_URL: http://edgesphere-storage:3002
       ANALYTICS_SERVICE_URL: http://edgesphere-analytics:3003
+      NOTIFICATIONS_SERVICE_URL: http://edgesphere-notifications:3005
+      CACHE_SERVICE_URL: http://edgesphere-cache:3004
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}

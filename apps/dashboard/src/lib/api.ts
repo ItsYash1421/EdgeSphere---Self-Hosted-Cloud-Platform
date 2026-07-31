@@ -1,9 +1,11 @@
 /**
  * EdgeSphere API client
- * Handles auth headers, token refresh, and error normalization.
+ * Handles auth headers, token refresh, and error normalization using Redux Store.
  */
+import { store } from '../store';
+import { logout, setCredentials } from '../store/slices/authSlice';
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
 class ApiError extends Error {
   status: number;
@@ -22,7 +24,14 @@ async function request<T>(
   body?: unknown,
   isFormData = false,
 ): Promise<T> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+  let token = null;
+  let refreshToken = null;
+
+  if (typeof window !== 'undefined') {
+    const authState = store.getState().auth;
+    token = authState.accessToken;
+    refreshToken = authState.refreshToken;
+  }
 
   const headers: HeadersInit = {};
   if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -36,7 +45,6 @@ async function request<T>(
 
   // Handle 401 — try token refresh
   if (res.status === 401 && typeof window !== 'undefined') {
-    const refreshToken = localStorage.getItem('refresh_token');
     if (refreshToken) {
       try {
         const refreshRes = await fetch(`${BASE_URL}/v1/auth/refresh`, {
@@ -47,8 +55,16 @@ async function request<T>(
 
         if (refreshRes.ok) {
           const { accessToken, refreshToken: newRefresh } = await refreshRes.json();
-          localStorage.setItem('access_token', accessToken);
-          localStorage.setItem('refresh_token', newRefresh);
+          
+          // Update Redux Store!
+          const user = store.getState().auth.user;
+          if (user) {
+            store.dispatch(setCredentials({
+              user,
+              accessToken,
+              refreshToken: newRefresh
+            }));
+          }
 
           // Retry original request with new token
           headers['Authorization'] = `Bearer ${accessToken}`;
@@ -56,18 +72,19 @@ async function request<T>(
             method, headers,
             body: isFormData ? (body as FormData) : body ? JSON.stringify(body) : undefined,
           });
-          if (retryRes.ok) return retryRes.json();
+          if (retryRes.ok) {
+            if (retryRes.status === 204) return undefined as T;
+            return retryRes.json();
+          }
         }
       } catch {
-        // Refresh failed — clear tokens
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
+        // Refresh failed — clear Redux tokens
+        store.dispatch(logout());
         window.location.href = '/login';
       }
     }
 
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
+    store.dispatch(logout());
     if (typeof window !== 'undefined') window.location.href = '/login';
     throw new ApiError('Unauthorized', 401, 'AUTH_002');
   }
@@ -83,9 +100,9 @@ async function request<T>(
 
 const api = {
   get: <T>(path: string) => request<T>('GET', path),
-  post: <T>(path: string, body: unknown) => request<T>('POST', path, body),
-  put: <T>(path: string, body: unknown) => request<T>('PUT', path, body),
-  patch: <T>(path: string, body: unknown) => request<T>('PATCH', path, body),
+  post: <T>(path: string, body?: unknown) => request<T>('POST', path, body),
+  put: <T>(path: string, body?: unknown) => request<T>('PUT', path, body),
+  patch: <T>(path: string, body?: unknown) => request<T>('PATCH', path, body),
   delete: <T>(path: string) => request<T>('DELETE', path),
   upload: <T>(path: string, formData: FormData) => request<T>('POST', path, formData, true),
 };

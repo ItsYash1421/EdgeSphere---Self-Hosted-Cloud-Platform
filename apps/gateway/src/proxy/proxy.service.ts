@@ -42,6 +42,24 @@ export class ProxyService {
         '^/v1/analytics': '/analytics',
       },
     });
+
+    const notifUrl = this.configService.get('NOTIFICATIONS_SERVICE_URL') || 'http://localhost:3005';
+    this.proxies['notifications'] = createProxyMiddleware({
+      target: notifUrl,
+      changeOrigin: true,
+      pathRewrite: {
+        '^/v1/notifications': '/notifications',
+      },
+    });
+
+    const cacheUrl = this.configService.get('CACHE_SERVICE_URL') || 'http://localhost:3004';
+    this.proxies['cache'] = createProxyMiddleware({
+      target: cacheUrl,
+      changeOrigin: true,
+      pathRewrite: {
+        '^/v1/cache': '/cache',
+      },
+    });
   }
 
   async handle(req: Request, res: Response, next: NextFunction, service: string) {

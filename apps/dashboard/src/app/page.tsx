@@ -2,19 +2,21 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSelector } from 'react-redux';
+import { RootState } from '../store';
 
 export default function HomePage() {
   const router = useRouter();
 
+  const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
+
   useEffect(() => {
-    // Redirect to dashboard or login based on auth state
-    const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-    if (token) {
+    if (isAuthenticated) {
       router.replace('/dashboard');
     } else {
       router.replace('/login');
     }
-  }, [router]);
+  }, [isAuthenticated, router]);
 
   return (
     <div style={{
