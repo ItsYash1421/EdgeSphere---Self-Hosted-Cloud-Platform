@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { RedisModule } from '@nestjs-modules/ioredis';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { HealthModule } from './health/health.module';
@@ -14,6 +15,16 @@ import { MetricsModule } from './metrics/metrics.module';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
+    }),
+
+    // ─── Redis ──────────────────────────────────────────────────
+    RedisModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        type: 'single',
+        url: `redis://:${config.get('REDIS_PASSWORD', '')}@${config.get('REDIS_HOST', 'localhost')}:${config.get('REDIS_PORT', 6379)}`,
+      }),
     }),
 
     // ─── Database (PostgreSQL) ──────────────────────────────────

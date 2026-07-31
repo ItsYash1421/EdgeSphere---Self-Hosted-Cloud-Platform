@@ -23,16 +23,14 @@ export class EventPublisherService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleInit() {
-    try {
-      await this.producer.connect();
-      console.log('Gateway Kafka Producer connected');
-    } catch (error) {
-      console.error('Failed to connect Gateway Kafka Producer', error);
-    }
+    // Connect in background — don't crash gateway if Kafka is unavailable
+    this.producer.connect()
+      .then(() => console.log('Gateway Kafka Producer connected'))
+      .catch((err) => console.warn('Kafka unavailable, events will be skipped:', err.message));
   }
 
   async onModuleDestroy() {
-    await this.producer.disconnect();
+    try { await this.producer.disconnect(); } catch (_) {}
   }
 
   async publishRequestEvent(data: {

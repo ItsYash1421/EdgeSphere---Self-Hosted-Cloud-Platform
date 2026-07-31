@@ -26,9 +26,13 @@ export class DlqService {
   }
 
   async onModuleInit() {
-    await this.producer.connect();
-    await this.consumer.connect();
-    this.subscribeAndRetry();
+    // Connect in background — non-blocking so gateway starts even without Kafka
+    Promise.all([this.producer.connect(), this.consumer.connect()])
+      .then(() => {
+        console.log('DLQ Kafka connected');
+        this.subscribeAndRetry();
+      })
+      .catch((err) => console.warn('DLQ Kafka unavailable, skipping:', err.message));
   }
 
   async onModuleDestroy() {

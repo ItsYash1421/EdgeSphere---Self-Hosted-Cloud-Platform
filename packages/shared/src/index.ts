@@ -14,33 +14,37 @@ export * from './phase4';
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
-export enum UserRole {
-  ADMIN = 'admin',
-  USER = 'user',
-  VIEWER = 'viewer',
-}
+export const UserRole = {
+  ADMIN: 'admin',
+  USER: 'user',
+  VIEWER: 'viewer',
+} as const;
+export type UserRole = typeof UserRole[keyof typeof UserRole];
 
-export enum EventTopic {
-  AUTH_EVENTS = 'auth-events',
-  STORAGE_EVENTS = 'storage-events',
-  REQUEST_EVENTS = 'request-events',
-  CACHE_INVALIDATION = 'cache-invalidation',
-  NOTIFICATION_EVENTS = 'notification-events',
-}
+export const EventTopic = {
+  AUTH_EVENTS: 'auth-events',
+  STORAGE_EVENTS: 'storage-events',
+  REQUEST_EVENTS: 'request-events',
+  CACHE_INVALIDATION: 'cache-invalidation',
+  NOTIFICATION_EVENTS: 'notification-events',
+} as const;
+export type EventTopic = typeof EventTopic[keyof typeof EventTopic];
 
-export enum CacheRegion {
-  US_EAST_1 = 'us-east-1',
-  EU_WEST_1 = 'eu-west-1',
-  AP_SOUTH_1 = 'ap-south-1',
-}
+export const CacheRegion = {
+  US_EAST_1: 'us-east-1',
+  EU_WEST_1: 'eu-west-1',
+  AP_SOUTH_1: 'ap-south-1',
+} as const;
+export type CacheRegion = typeof CacheRegion[keyof typeof CacheRegion];
 
-export enum HttpMethod {
-  GET = 'GET',
-  POST = 'POST',
-  PUT = 'PUT',
-  PATCH = 'PATCH',
-  DELETE = 'DELETE',
-}
+export const HttpMethod = {
+  GET: 'GET',
+  POST: 'POST',
+  PUT: 'PUT',
+  PATCH: 'PATCH',
+  DELETE: 'DELETE',
+} as const;
+export type HttpMethod = typeof HttpMethod[keyof typeof HttpMethod];
 
 // ─── JWT ──────────────────────────────────────────────────────────────────────
 
@@ -217,21 +221,23 @@ export interface KafkaMessage<T = unknown> {
 
 // ─── Notifications ────────────────────────────────────────────────────────────
 
-export enum NotificationChannel {
-  EMAIL = 'email',
-  WEBHOOK = 'webhook',
-  SLACK = 'slack',
-  DISCORD = 'discord',
-}
+export const NotificationChannel = {
+  EMAIL: 'email',
+  WEBHOOK: 'webhook',
+  SLACK: 'slack',
+  DISCORD: 'discord',
+} as const;
+export type NotificationChannel = typeof NotificationChannel[keyof typeof NotificationChannel];
 
-export enum NotificationTrigger {
-  STORAGE_QUOTA_EXCEEDED = 'storage.quota.exceeded',
-  TRAFFIC_SPIKE = 'traffic.spike',
-  EDGE_SERVER_DOWN = 'edge.server.down',
-  CACHE_PURGE_COMPLETE = 'cache.purge.complete',
-  UPLOAD_COMPLETE = 'upload.complete',
-  HIGH_ERROR_RATE = 'error.rate.high',
-}
+export const NotificationTrigger = {
+  STORAGE_QUOTA_EXCEEDED: 'storage.quota.exceeded',
+  TRAFFIC_SPIKE: 'traffic.spike',
+  EDGE_SERVER_DOWN: 'edge.server.down',
+  CACHE_PURGE_COMPLETE: 'cache.purge.complete',
+  UPLOAD_COMPLETE: 'upload.complete',
+  HIGH_ERROR_RATE: 'error.rate.high',
+} as const;
+export type NotificationTrigger = typeof NotificationTrigger[keyof typeof NotificationTrigger];
 
 export interface NotificationEvent {
   trigger: NotificationTrigger;
@@ -259,29 +265,30 @@ export interface RateLimitConfig {
 
 // ─── Errors ───────────────────────────────────────────────────────────────────
 
-export enum ErrorCode {
+export const ErrorCode = {
   // Auth
-  INVALID_CREDENTIALS = 'AUTH_001',
-  TOKEN_EXPIRED = 'AUTH_002',
-  TOKEN_INVALID = 'AUTH_003',
-  INSUFFICIENT_PERMISSIONS = 'AUTH_004',
-  API_KEY_INVALID = 'AUTH_005',
+  INVALID_CREDENTIALS: 'AUTH_001',
+  TOKEN_EXPIRED: 'AUTH_002',
+  TOKEN_INVALID: 'AUTH_003',
+  INSUFFICIENT_PERMISSIONS: 'AUTH_004',
+  API_KEY_INVALID: 'AUTH_005',
 
   // Storage
-  BUCKET_NOT_FOUND = 'STORAGE_001',
-  BUCKET_ALREADY_EXISTS = 'STORAGE_002',
-  FILE_NOT_FOUND = 'STORAGE_003',
-  FILE_TOO_LARGE = 'STORAGE_004',
-  QUOTA_EXCEEDED = 'STORAGE_005',
+  BUCKET_NOT_FOUND: 'STORAGE_001',
+  BUCKET_ALREADY_EXISTS: 'STORAGE_002',
+  FILE_NOT_FOUND: 'STORAGE_003',
+  FILE_TOO_LARGE: 'STORAGE_004',
+  QUOTA_EXCEEDED: 'STORAGE_005',
 
   // Rate Limiting
-  RATE_LIMIT_EXCEEDED = 'GATEWAY_001',
+  RATE_LIMIT_EXCEEDED: 'GATEWAY_001',
 
   // General
-  VALIDATION_ERROR = 'GENERAL_001',
-  INTERNAL_ERROR = 'GENERAL_002',
-  SERVICE_UNAVAILABLE = 'GENERAL_003',
-}
+  VALIDATION_ERROR: 'GENERAL_001',
+  INTERNAL_ERROR: 'GENERAL_002',
+  SERVICE_UNAVAILABLE: 'GENERAL_003',
+} as const;
+export type ErrorCode = typeof ErrorCode[keyof typeof ErrorCode];
 
 export interface EdgeSphereError {
   code: ErrorCode;

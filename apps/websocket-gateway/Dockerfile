@@ -1,26 +1,15 @@
-FROM node:20-alpine
+FROM node:22-alpine
 RUN npm install -g pnpm@9
-
 WORKDIR /app
 
-# Copy root workspace files
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
-COPY pnpm-workspace.yaml ./
-
-# Copy shared packages
 COPY packages/ ./packages/
+COPY apps/websocket-gateway/package.json ./apps/websocket-gateway/
+RUN pnpm install --filter @edgesphere/websocket-gateway...
 
-# Copy service files
-COPY apps/websocket-gateway/ ./apps/websocket-gateway/
-
-# Install dependencies using pnpm
-RUN npm install -g pnpm && pnpm install --filter @edgesphere/websocket-gateway...
-
-WORKDIR /app/apps/websocket-gateway
-
-# Build service
-RUN pnpm run build
+COPY apps/websocket-gateway ./apps/websocket-gateway
+RUN pnpm --filter @edgesphere/websocket-gateway build
 
 EXPOSE 3006
-
-CMD ["node", "dist/main"]
+ENV NODE_ENV=production
+CMD ["node", "apps/websocket-gateway/dist/main"]
