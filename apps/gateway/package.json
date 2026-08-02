@@ -19,6 +19,7 @@
     "@nestjs/swagger": "^7.0.0",
     "@nestjs-modules/ioredis": "^2.0.0",
     "ioredis": "^5.0.0",
+    "express": "^4.22.1",
     "http-proxy-middleware": "^3.0.0",
     "prom-client": "^15.0.0",
     "jsonwebtoken": "^9.0.0",

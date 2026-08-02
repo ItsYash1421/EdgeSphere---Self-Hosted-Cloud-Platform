@@ -463,6 +463,9 @@ importers:
       axios:
         specifier: ^1.6.0
         version: 1.18.1
+      express:
+        specifier: ^4.22.1
+        version: 4.22.1
       http-proxy-middleware:
         specifier: ^3.0.0
         version: 3.0.7
@@ -621,6 +624,9 @@ importers:
       express:
         specifier: ^4.22.1
         version: 4.22.1
+      ioredis:
+        specifier: ^5.0.0
+        version: 5.11.1
       jsonwebtoken:
         specifier: ^9.0.0
         version: 9.0.3

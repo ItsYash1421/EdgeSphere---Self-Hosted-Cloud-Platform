@@ -133,7 +133,8 @@ export class CdnService implements OnModuleInit {
       etag
     };
     
-    await this.cacheService.set(cacheKey, JSON.stringify(cacheObject), this.ttlSeconds);
+    const ttlSeconds = await this.cacheService.getConfiguredTtlSeconds(this.ttlSeconds);
+    await this.cacheService.set(cacheKey, JSON.stringify(cacheObject), ttlSeconds);
     
     const response: CdnResponse = { data, contentType, etag, cacheHit: false };
     this.memoryCache.set(cacheKey, response);

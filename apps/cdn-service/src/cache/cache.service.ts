@@ -60,6 +60,14 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     return await this.redisClient.ttl(key);
   }
 
+  // Reads the admin-configurable cache TTL shared with the gateway's /config endpoint.
+  // this.redisClient already applies the "edgesphere:" keyPrefix, so "platform_config"
+  // here resolves to the same physical key the gateway writes as "edgesphere:platform_config".
+  async getConfiguredTtlSeconds(defaultTtl: number): Promise<number> {
+    const val = await this.redisClient.hget('platform_config', 'cacheTtlSeconds');
+    return val ? parseInt(val, 10) : defaultTtl;
+  }
+
   async publishInvalidation(event: { bucket: string; key?: string }): Promise<void> {
     await this.redisClient.publish("cache:invalidate", JSON.stringify(event));
   }

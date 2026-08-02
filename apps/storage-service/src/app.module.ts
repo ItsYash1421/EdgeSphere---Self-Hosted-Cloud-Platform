@@ -8,6 +8,7 @@ import { FileEntity } from './files/file.entity';
 import { MinioModule } from './minio/minio.module';
 import { MultipartModule } from './multipart/multipart.module';
 import { EventsModule } from './events/events.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { EventsModule } from './events/events.module';
     FilesModule,
     MultipartModule,
     EventsModule,
+    HealthModule,
   ],
 })
 export class AppModule {}

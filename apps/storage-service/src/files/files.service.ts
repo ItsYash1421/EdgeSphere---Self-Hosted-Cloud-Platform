@@ -6,6 +6,9 @@ import { BucketEntity } from '../buckets/bucket.entity';
 import { MinioService } from '../minio/minio.service';
 import { v4 as uuidv4 } from 'uuid';
 import { ConfigService } from '@nestjs/config';
+import { PlatformConfigService } from '../config/platform-config.service';
+
+const DEFAULT_MAX_FILE_SIZE_MB = 5120;
 
 @Injectable()
 export class FilesService {
@@ -16,6 +19,7 @@ export class FilesService {
     private readonly bucketRepo: Repository<BucketEntity>,
     private readonly minioService: MinioService,
     private readonly configService: ConfigService,
+    private readonly platformConfigService: PlatformConfigService,
   ) {}
 
   private async getBucketOrThrow(userId: string, bucketName: string, checkOwner = true): Promise<BucketEntity> {
@@ -34,6 +38,13 @@ export class FilesService {
 
   async uploadFile(userId: string, bucketName: string, file: Express.Multer.File, key?: string): Promise<FileEntity> {
     const bucket = await this.getBucketOrThrow(userId, bucketName, true);
+
+    const maxSizeMb = await this.platformConfigService.getMaxFileSizeMb(DEFAULT_MAX_FILE_SIZE_MB);
+    const maxSizeBytes = maxSizeMb * 1024 * 1024;
+    if (file.size > maxSizeBytes) {
+      throw new BadRequestException(`File exceeds the maximum allowed size of ${maxSizeMb} MB`);
+    }
+
     const finalKey = key || uuidv4();
 
     const etag = await this.minioService.uploadFile(

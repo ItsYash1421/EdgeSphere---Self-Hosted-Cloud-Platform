@@ -1,4 +1,5 @@
 import { Module, MiddlewareConsumer, NestModule, RequestMethod } from '@nestjs/common';
+import { json } from 'express';
 import { ConfigModule } from '@nestjs/config';
 import { RedisModule } from '@nestjs-modules/ioredis';
 import { ProxyModule } from './proxy/proxy.module';
@@ -6,6 +7,7 @@ import { RateLimitModule } from './rate-limit/rate-limit.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { HealthModule } from './health/health.module';
 import { EventsModule } from './events/events.module';
+import { PlatformConfigModule } from './config/platform-config.module';
 import { AuthMiddleware } from './middleware/auth.middleware';
 import { LoggingMiddleware } from './middleware/logging.middleware';
 import { CdnCacheMiddleware } from './middleware/cdn-cache.middleware';
@@ -24,10 +26,18 @@ import { CdnCacheMiddleware } from './middleware/cdn-cache.middleware';
     MetricsModule,
     HealthModule,
     EventsModule,
+    PlatformConfigModule,
   ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
+    // The gateway runs with bodyParser: false globally so proxied requests forward
+    // their raw body untouched to downstream services. Local (non-proxied) routes
+    // that need a parsed JSON body — like /config — opt in explicitly here.
+    consumer
+      .apply(json())
+      .forRoutes('config');
+
     consumer
       .apply(LoggingMiddleware)
       .forRoutes('*');

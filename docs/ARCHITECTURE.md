@@ -147,7 +147,8 @@ Routing Table:
   /v1/storage/*   → storage-service:3002
   /v1/analytics/* → analytics-service:3003
   /v1/cache/*     → cache-service:3004
-  /v1/notify/*    → notification-service:3005
+  /v1/notifications/* → notification-service:3005
+  /config         → gateway (local route, admin-gated PATCH — see §7.2)
 
 Prometheus Metrics:
   http_requests_total{method,path,status,service}
@@ -516,6 +517,74 @@ Headers            HSTS, CSP, X-Frame-Options, X-XSS-Protection
 | Tracing | Jaeger | Zipkin | Better UI, native OpenTelemetry support |
 | Log Aggregation | Loki | ELK Stack | Lighter weight, native Grafana integration |
 | IaC | Terraform | Pulumi | More tooling, larger community |
+
+---
+
+## 7. Dashboard Real-Data Integration (Phase 6)
+
+> Added after a full audit of the dashboard confirmed several pages were rendering mock/hardcoded
+> data despite the backend already supporting them, plus a few real backend bugs that were silently
+> breaking data end-to-end. All 11 dashboard pages are now wired to live backend data; the mock-data
+> gaps and the bugs that were fixed are recorded here so they aren't rediscovered.
+
+### 7.1 What changed
+
+| Page | Before | Now |
+|------|--------|-----|
+| Overview | Hardcoded edge-server cards; summary stats read wrong field names (rendered `NaN%`) | Real edge stats (auto-discovered from traffic), correct field mapping |
+| Storage | `MOCK_BUCKETS`/`MOCK_FILES` arrays, fake `setTimeout` actions | Full CRUD against `storage-service` (Postgres + MinIO) |
+| CDN | Hardcoded stats, simulated purge | Real purge via `cache-service`, real Redis-backed stats |
+| API Keys | Client-side fake key generation, no backend calls | Real `ApiKeyEntity` (new) in `auth-service`, persisted create/list/revoke |
+| Edge Servers | Hardcoded 2-edge array | `GET /analytics/edges` — grouped by `edge_region` from `request_events` |
+| Logs | `Math.random()`-generated rows on every render | `GET /analytics/events/search` — real filter/pagination |
+| Settings | Static defaults, "Save" did nothing | Real profile `GET/PATCH /auth/me`; real, admin-gated Platform Configuration (see 7.2) |
+| Monitoring | Hardcoded "online" badges | Real per-service health via gateway's `/health` aggregator |
+
+### 7.2 Platform Configuration (new)
+
+`GET/PATCH /config` on the gateway, backed by a single Redis hash (`edgesphere:platform_config`):
+
+```
+GET  /config   → any authenticated user (read-only)
+PATCH /config  → admin role only (403 for non-admins) — first real consumer of the
+                 @Roles()/RolesGuard scaffolding in auth-service, which existed but had
+                 never been applied to a route before this
+```
+
+Three settings, all genuinely enforced (not just stored):
+- `rateLimitPerIp` — read by `gateway`'s `AuthMiddleware` on every authenticated request (previously
+  hardcoded to `100`).
+- `cacheTtlSeconds` — read by `cdn-service`'s `CdnService` on every cache write (previously frozen at
+  the value of `CACHE_TTL_SECONDS` read once at boot).
+- `maxFileSizeMb` — checked by `storage-service`'s `FilesService.uploadFile()` before any MinIO call;
+  previously there was **no file size limit enforced anywhere**.
+
+Cross-service reads all resolve to the same physical Redis key despite each service's Redis client
+using different prefix conventions — see `apps/gateway/src/config/platform-config.service.ts` for the
+canonical key and the comment explaining each service's prefix handling.
+
+### 7.3 Backend bugs found and fixed during this pass
+
+These were not dashboard bugs — they were real backend defects the audit surfaced:
+
+1. **`RequestEventEntity.userId`** (`apps/analytics-service/src/analytics/request-event.entity.ts`)
+   had no `name: 'user_id'` column mapping, unlike every sibling column. Raw-SQL reads never hit this,
+   but the moment an entity-metadata-driven insert was added, every Kafka-consumed request event
+   failed to persist — `request_events` had been empty since the service was first stood up.
+2. **`storage-service`** had `DB_USERNAME` instead of `DB_USER` in its TypeORM config — docker-compose
+   never set that variable, so it silently used the wrong default credentials and crash-looped.
+3. **`storage-service`** and **`gateway`** both `import` the `express` package directly in source but
+   never declared it as a direct dependency (only pulled transitively via `@nestjs/platform-express`)
+   — worked locally via pnpm hoisting, `MODULE_NOT_FOUND` inside Docker's strict linking.
+4. **`storage-service`** had no `/health` endpoint at all (the only backend service missing one),
+   which made the gateway's health aggregator — and the dashboard's Service Health panel — correctly
+   but confusingly report it as "down" even while functioning normally.
+5. **`websocket-gateway`**'s live metrics emitter (`kafka-consumer.service.ts`) emitted
+   `Math.random()` for req/s, cache-hit-ratio, latency, and error-rate every 5 seconds — this fed the
+   "Live" indicator shown in the dashboard topbar on every page. Replaced with a real rolling window
+   computed from the `request.events` messages the same consumer already receives.
+6. **`cache-service`**'s `getCacheStats()` hardcoded `hitRatio: 0.95`. The CDN dashboard page now
+   sources cache hit ratio from `analytics-service`'s real `getCacheHitRatio()` instead.
 
 ---
 

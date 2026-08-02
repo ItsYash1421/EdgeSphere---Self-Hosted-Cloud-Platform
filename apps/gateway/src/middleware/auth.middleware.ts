@@ -3,12 +3,14 @@ import { Request, Response, NextFunction } from 'express';
 import { ConfigService } from '@nestjs/config';
 import * as jwt from 'jsonwebtoken';
 import { RateLimitService } from '../rate-limit/rate-limit.service';
+import { PlatformConfigService } from '../config/platform-config.service';
 
 @Injectable()
 export class AuthMiddleware implements NestMiddleware {
   constructor(
     private configService: ConfigService,
-    private rateLimitService: RateLimitService
+    private rateLimitService: RateLimitService,
+    private platformConfigService: PlatformConfigService,
   ) {}
 
   async use(req: Request & { user?: any }, res: Response, next: NextFunction) {
@@ -34,9 +36,9 @@ export class AuthMiddleware implements NestMiddleware {
       const payload = jwt.verify(token, secret);
       req.user = payload;
       
-      // Apply Rate Limiting
+      // Apply Rate Limiting (limit is admin-configurable via /config)
       const userId = (payload as any).sub || (payload as any).id || 'anonymous';
-      const limit = 100;
+      const limit = await this.platformConfigService.getRateLimitPerIp();
       const rateLimitRes = await this.rateLimitService.slidingWindow(userId, limit);
       
       res.setHeader('X-RateLimit-Limit', limit.toString());
