@@ -134,7 +134,7 @@ export default function LiveEventsPage() {
               {filteredEvents.map((evt, i) => (
                 <tr key={i} style={{ borderBottom: '1px solid var(--border)', animation: 'slideIn 0.3s ease-out' }}>
                   <td style={{ padding: '12px 8px', color: 'var(--text-secondary)' }}>
-                    {new Date(evt.timestamp).toLocaleTimeString()}
+                    {new Date(evt.time).toLocaleTimeString()}
                   </td>
                   <td style={{ padding: '12px 8px' }}>{evt.service}</td>
                   <td style={{ padding: '12px 8px', fontWeight: 600 }}>{evt.method}</td>
@@ -155,7 +155,7 @@ export default function LiveEventsPage() {
                   <td style={{ padding: '12px 8px' }}>
                     {evt.cacheHit ? <span style={{ color: 'var(--green)' }}>HIT</span> : <span style={{ color: 'var(--text-muted)' }}>MISS</span>}
                   </td>
-                  <td style={{ padding: '12px 8px', color: 'var(--text-secondary)' }}>{evt.region || '-'}</td>
+                  <td style={{ padding: '12px 8px', color: 'var(--text-secondary)' }}>{evt.edgeRegion || '-'}</td>
                 </tr>
               ))}
               {filteredEvents.length === 0 && (

@@ -119,18 +119,16 @@ export class InvalidationService {
     return history.map(item => JSON.parse(item));
   }
 
-  async getCacheStats(): Promise<{ totalKeys: number; memoryUsed: string; hitRatio: number }> {
+  async getCacheStats(): Promise<{ totalKeys: number; memoryUsed: string }> {
     const info = await this.redis.info('memory');
     const memoryUsedMatch = info.match(/used_memory_human:(.*)/);
     const memoryUsed = memoryUsedMatch ? memoryUsedMatch[1].trim() : '0B';
-    
-    // We would need to parse Keyspace info for total keys, but for a simplified version:
+
     const dbSize = await this.redis.dbsize();
-    
+
     return {
       totalKeys: dbSize,
       memoryUsed,
-      hitRatio: 0.95, // Mocked for now, would typically be derived from keyspace hits/misses
     };
   }
 

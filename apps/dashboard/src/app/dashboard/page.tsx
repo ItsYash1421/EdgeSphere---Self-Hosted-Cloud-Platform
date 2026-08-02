@@ -98,17 +98,23 @@ export default function DashboardOverview() {
   const [summary, setSummary] = useState<any>(null);
   const [recentEvents, setRecentEvents] = useState<any[]>([]);
   const [rateData, setRateData] = useState<any[]>([]);
+  const [cacheRatioSeries, setCacheRatioSeries] = useState<any[]>([]);
+  const [edges, setEdges] = useState<any[]>([]);
 
   const fetchData = async () => {
     try {
-      const [sumData, events, rate] = await Promise.all([
+      const [sumData, events, rate, cacheSeries, edgeStats] = await Promise.all([
         api.get<any>('/v1/analytics/summary'),
         api.get<any[]>('/v1/analytics/events/recent?limit=10'),
-        api.get<any[]>('/v1/analytics/requests/rate?window=60')
+        api.get<any[]>('/v1/analytics/requests/rate?window=60'),
+        api.get<any[]>('/v1/analytics/cache/ratio/timeseries?window=60'),
+        api.get<any[]>('/v1/analytics/edges?window=60'),
       ]);
       setSummary(sumData);
       setRecentEvents(events);
       setRateData(rate);
+      setCacheRatioSeries(cacheSeries);
+      setEdges(edgeStats);
     } catch (err) {
       console.error('Failed to fetch analytics', err);
     } finally {
@@ -134,17 +140,17 @@ export default function DashboardOverview() {
   }
 
   // Fallbacks if data is zero/missing from brand new DB
-  const stats = summary || { totalRequests: 0, cacheHits: 0, bandwidth: 0, errors: 0 };
-  const hitRatio = stats.totalRequests > 0 ? ((stats.cacheHits / stats.totalRequests) * 100).toFixed(1) : '0.0';
-  const errorRatio = stats.totalRequests > 0 ? ((stats.errors / stats.totalRequests) * 100).toFixed(2) : '0.00';
-  const liveRPS = rateData.length > 0 ? rateData[rateData.length - 1].requests : 0;
+  const stats = summary || { totalRequests: 0, cacheHitRatio: 0, totalBandwidthBytes: 0, errorRate: 0 };
+  const hitRatio = (stats.cacheHitRatio * 100).toFixed(1);
+  const errorRatio = (stats.errorRate * 100).toFixed(2);
+  const liveRPS = rateData.length > 0 ? +(rateData[rateData.length - 1].value / 60).toFixed(1) : 0;
 
-  // Transform rateData for charts
+  // Transform rateData for the chart, joining in the real cache-hit-ratio time series by bucket
+  const cacheRatioByBucket = new Map(cacheRatioSeries.map((c) => [String(c.t), c.value]));
   const chartData = rateData.length > 0 ? rateData.map(d => ({
-    time: new Date(d.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    requests: d.requests,
-    cacheHit: Math.floor(d.requests * 0.8), // simulated cache hits based on requests for visual
-    latency: Math.floor(Math.random() * 40 + 20) // simulated latency
+    time: new Date(d.t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    requests: d.value,
+    cacheHitPct: cacheRatioByBucket.get(String(d.t)) ?? 0,
   })) : [];
 
   return (
@@ -192,7 +198,7 @@ export default function DashboardOverview() {
               </span>
               <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--green)', display: 'inline-block' }} />
-                Cache Hits
+                Cache Hit %
               </span>
             </div>
           </div>
@@ -211,10 +217,11 @@ export default function DashboardOverview() {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                 <XAxis dataKey="time" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} width={40} />
+                <YAxis yAxisId="requests" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} width={40} />
+                <YAxis yAxisId="pct" orientation="right" domain={[0, 100]} tick={{ fontSize: 11, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} width={36} />
                 <Tooltip contentStyle={CustomTooltipStyle} />
-                <Area type="monotone" dataKey="requests" stroke="var(--brand)" strokeWidth={2} fill="url(#reqGrad)" />
-                <Area type="monotone" dataKey="cacheHit" stroke="var(--green)" strokeWidth={2} fill="url(#cacheGrad)" />
+                <Area yAxisId="requests" type="monotone" dataKey="requests" stroke="var(--brand)" strokeWidth={2} fill="url(#reqGrad)" name="Requests" />
+                <Area yAxisId="pct" type="monotone" dataKey="cacheHitPct" stroke="var(--green)" strokeWidth={2} fill="url(#cacheGrad)" name="Cache Hit %" />
               </AreaChart>
             ) : (
               <div style={{ display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
@@ -233,8 +240,24 @@ export default function DashboardOverview() {
           </h2>
         </div>
         <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
-          <EdgeServerCard name="Edge us-east-1" region="N. Virginia" status="online" cacheHit="—" requests="0/s" latency="—" />
-          <EdgeServerCard name="Edge eu-central-1" region="Frankfurt" status="online" cacheHit="—" requests="0/s" latency="—" />
+          {edges.length > 0 ? edges.map((edge) => {
+            const isOnline = Date.now() - new Date(edge.lastSeen).getTime() < 5 * 60 * 1000;
+            return (
+              <EdgeServerCard
+                key={edge.region}
+                name={`Edge ${edge.region}`}
+                region={edge.region}
+                status={isOnline ? 'online' : 'offline'}
+                cacheHit={`${Math.round(edge.cacheHitRatio * 100)}%`}
+                requests={edge.requests.toLocaleString()}
+                latency={`${Math.round(edge.avgLatencyMs)}ms`}
+              />
+            );
+          }) : (
+            <div className="card" style={{ flex: 1, color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>
+              No edge servers have reported traffic in this window yet.
+            </div>
+          )}
         </div>
       </div>
 
@@ -271,14 +294,14 @@ export default function DashboardOverview() {
                     <code style={{ wordBreak: 'break-all' }}>{req.path}</code>
                   </td>
                   <td>
-                    <span className={`badge ${STATUS_CLASS[req.statusCode] || 'badge-secondary'}`}>
-                      {req.statusCode}
+                    <span className={`badge ${STATUS_CLASS[req.status] || 'badge-secondary'}`}>
+                      {req.status}
                     </span>
                   </td>
                   <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{req.latencyMs}ms</td>
                   <td><span className="badge badge-secondary">{req.ip}</span></td>
                   <td style={{ color: 'var(--text-muted)', fontSize: 12, minWidth: 100 }}>
-                    {new Date(req.timestamp).toLocaleTimeString()}
+                    {new Date(req.time).toLocaleTimeString()}
                   </td>
                 </tr>
               )) : (

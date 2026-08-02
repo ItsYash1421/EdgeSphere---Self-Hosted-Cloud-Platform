@@ -14,6 +14,7 @@ import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { UserEntity } from '../users/user.entity';
+import { ApiKeyEntity } from './api-key.entity';
 import { LoginDto, RegisterDto } from './dto/auth.dto';
 import { TokenPair, JwtPayload } from '@edgesphere/shared';
 import { createLogger } from '@edgesphere/logger';
@@ -29,6 +30,8 @@ export class AuthService {
   constructor(
     @InjectRepository(UserEntity)
     private readonly usersRepo: Repository<UserEntity>,
+    @InjectRepository(ApiKeyEntity)
+    private readonly apiKeysRepo: Repository<ApiKeyEntity>,
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
     @InjectRedis() private readonly redis: Redis,
@@ -123,28 +126,54 @@ export class AuthService {
     return profile;
   }
 
+  async updateProfile(userId: string, updates: { displayName?: string }) {
+    const user = await this.usersRepo.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+
+    if (updates.displayName !== undefined) {
+      user.displayName = updates.displayName;
+    }
+    await this.usersRepo.save(user);
+
+    const { passwordHash: _, ...profile } = user;
+    logger.info({ userId }, 'Profile updated');
+    return profile;
+  }
+
   async createApiKey(userId: string, name: string) {
     const rawKey = `esk_${uuidv4().replace(/-/g, '')}`;
     const keyHash = await bcrypt.hash(rawKey, 10);
     const keyPrefix = rawKey.substring(0, 12);
 
+    const record = this.apiKeysRepo.create({ userId, name, keyHash, keyPrefix, lastUsedAt: null, expiresAt: null });
+    const saved = await this.apiKeysRepo.save(record);
+
     await this.redis.set(`apikey:${keyHash}`, userId, 'EX', 60 * 60 * 24 * 365);
 
     logger.info({ userId, name }, 'API key created');
     return {
+      id: saved.id,
       key: rawKey,
       keyPrefix,
       name,
-      createdAt: new Date(),
+      createdAt: saved.createdAt,
+      lastUsedAt: null,
+      expiresAt: null,
       message: 'Store this key securely — it will not be shown again',
     };
   }
 
   async listApiKeys(userId: string) {
-    return { keys: [], message: 'API key listing requires database table — TODO Phase 1' };
+    const keys = await this.apiKeysRepo.find({ where: { userId }, order: { createdAt: 'DESC' } });
+    return keys.map(({ keyHash, ...key }) => key);
   }
 
   async revokeApiKey(userId: string, keyId: string): Promise<void> {
+    const key = await this.apiKeysRepo.findOne({ where: { id: keyId, userId } });
+    if (!key) throw new NotFoundException('API key not found');
+
+    await this.redis.del(`apikey:${key.keyHash}`);
+    await this.apiKeysRepo.remove(key);
     logger.info({ userId, keyId }, 'API key revoked');
   }
 

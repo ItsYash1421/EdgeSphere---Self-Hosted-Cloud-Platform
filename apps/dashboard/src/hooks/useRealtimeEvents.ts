@@ -2,11 +2,16 @@ import { useState, useEffect } from 'react';
 import { getSocket, subscribeToRoom, unsubscribeFromRoom } from '../lib/websocket';
 
 export interface RequestEventDto {
-  id: string;
-  url: string;
+  time: string;
+  service: string;
+  method: string;
+  path: string;
   status: number;
-  durationMs: number;
-  timestamp: string;
+  latencyMs: number;
+  ip: string;
+  cacheHit: boolean;
+  bytes: number;
+  edgeRegion?: string;
 }
 
 export function useRealtimeEvents(maxEvents: number = 100) {

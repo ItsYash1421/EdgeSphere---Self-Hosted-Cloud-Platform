@@ -42,6 +42,18 @@ export class AnalyticsController {
     return this.analyticsService.getCacheHitRatio(window);
   }
 
+  @Get('cache/ratio/timeseries')
+  @ApiOperation({ summary: 'Get cache hit ratio percentage over time' })
+  async getCacheHitRatioTimeSeries(@Query('window', new DefaultValuePipe(60), ParseIntPipe) window: number): Promise<TimeSeriesPoint[]> {
+    return this.analyticsService.getCacheHitRatioTimeSeries(window);
+  }
+
+  @Get('edges')
+  @ApiOperation({ summary: 'Get per-edge-region request stats' })
+  async getEdgeStats(@Query('window', new DefaultValuePipe(60), ParseIntPipe) window: number) {
+    return this.analyticsService.getEdgeStats(window);
+  }
+
   @Get('latency/percentiles')
   @ApiOperation({ summary: 'Get P50/P95/P99 latency percentiles' })
   async getLatencyPercentiles(@Query('window', new DefaultValuePipe(60), ParseIntPipe) window: number) {
@@ -77,6 +89,19 @@ export class AnalyticsController {
   @ApiOperation({ summary: 'Get real-time events' })
   async getRecentEvents(@Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number): Promise<RequestEventEntity[]> {
     return this.analyticsService.getRecentEvents(limit);
+  }
+
+  @Get('events/search')
+  @ApiOperation({ summary: 'Search request logs with filters and pagination' })
+  async searchEvents(
+    @Query('method') method?: string,
+    @Query('service') service?: string,
+    @Query('status') status?: '2xx' | '3xx' | '4xx' | '5xx',
+    @Query('q') q?: string,
+    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit?: number,
+    @Query('offset', new DefaultValuePipe(0), ParseIntPipe) offset?: number,
+  ) {
+    return this.analyticsService.searchEvents({ method, service, statusClass: status, query: q, limit, offset });
   }
 
   @Get('health')

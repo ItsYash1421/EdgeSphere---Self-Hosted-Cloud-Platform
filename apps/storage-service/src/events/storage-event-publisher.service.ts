@@ -16,11 +16,14 @@ export class StorageEventPublisherService implements OnModuleInit, OnModuleDestr
   }
 
   async onModuleInit() {
-    await this.producer.connect();
+    // Connect in background — don't crash storage-service if Kafka is unavailable
+    this.producer.connect()
+      .then(() => console.log('Storage Kafka Producer connected'))
+      .catch((err: Error) => console.warn('Kafka unavailable, storage events will be skipped:', err.message));
   }
 
   async onModuleDestroy() {
-    await this.producer.disconnect();
+    try { await this.producer.disconnect(); } catch (_) {}
   }
 
   async publishStorageEvent(payload: any) {

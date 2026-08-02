@@ -89,6 +89,10 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
   
   getConnectedClientsCount(): number {
-    return this.server.sockets.sockets.size;
+    // NestJS binds @WebSocketServer() to the '/realtime' namespace instance at
+    // runtime (since `namespace` is set on @WebSocketGateway), so `.sockets` here
+    // is already the connected-clients Map, not the root Server's nested Namespace.
+    const namespace = this.server as unknown as { sockets?: Map<string, unknown> };
+    return namespace.sockets?.size ?? 0;
   }
 }

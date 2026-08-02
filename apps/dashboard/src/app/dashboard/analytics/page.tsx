@@ -147,7 +147,7 @@ export default function AnalyticsPage() {
                   <span style={{ width: 10, height: 10, borderRadius: 2, background: d.color, display: 'inline-block' }} />
                   <span style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>{d.name}</span>
                 </div>
-                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{d.value}%</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{d.value.toLocaleString()}</span>
               </div>
             ))}
           </div>

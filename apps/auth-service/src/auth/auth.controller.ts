@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Get,
+  Patch,
   Body,
   Delete,
   Param,
@@ -19,7 +20,7 @@ import {
   ApiResponse,
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto, RefreshTokenDto, CreateApiKeyDto } from './dto/auth.dto';
+import { RegisterDto, LoginDto, RefreshTokenDto, CreateApiKeyDto, UpdateProfileDto } from './dto/auth.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { TokenPair } from '@edgesphere/shared';
 
@@ -78,6 +79,17 @@ export class AuthController {
   @ApiOperation({ summary: 'Get current user profile' })
   async getProfile(@Request() req: { user: { sub: string } }) {
     return this.authService.getProfile(req.user.sub);
+  }
+
+  @Patch('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update current user profile' })
+  async updateProfile(
+    @Request() req: { user: { sub: string } },
+    @Body() dto: UpdateProfileDto,
+  ) {
+    return this.authService.updateProfile(req.user.sub, dto);
   }
 
   @Post('api-keys')

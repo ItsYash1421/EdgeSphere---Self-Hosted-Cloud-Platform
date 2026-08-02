@@ -3,11 +3,13 @@
 import { ReactNode, useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import useSWR from 'swr';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import { logout } from '../../store/slices/authSlice';
 import { ThemeToggle } from '../../components/ThemeToggle';
 import { RealtimeIndicator } from '../../components/RealtimeIndicator';
+import api from '../../lib/api';
 import {
   LayoutDashboard, Database, Globe, Key, BarChart3, Radio, Bell,
   Server, ScrollText, Activity, Settings, LogOut, Zap, User, Menu, X
@@ -46,6 +48,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   
   const [mounted, setMounted] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const { data: healthData } = useSWR(
+    isAuthenticated ? '/health' : null,
+    (url: string) => api.get<any>(url),
+    { refreshInterval: 15000, shouldRetryOnError: false }
+  );
 
   useEffect(() => {
     setMounted(true);
@@ -141,15 +149,17 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               Service Health
             </div>
             {[
-              { name: 'API Gateway', status: 'Healthy' },
-              { name: 'Storage', status: 'Healthy' },
-              { name: 'Analytics', status: 'Healthy' },
+              { name: 'API Gateway', up: healthData ? healthData.status !== 'unhealthy' : undefined },
+              { name: 'Storage', up: healthData ? healthData.services?.['storage-service']?.status === 'up' : undefined },
+              { name: 'Analytics', up: healthData ? healthData.services?.['analytics-service']?.status === 'up' : undefined },
             ].map(svc => (
               <div key={svc.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                 <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{svc.name}</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span className="status-dot online pulse" />
-                  <span style={{ fontSize: 11, color: 'var(--green)', fontWeight: 600 }}>{svc.status}</span>
+                  <span className={`status-dot ${svc.up ? 'online pulse' : svc.up === false ? 'offline' : ''}`} />
+                  <span style={{ fontSize: 11, color: svc.up ? 'var(--green)' : svc.up === false ? 'var(--red)' : 'var(--text-muted)', fontWeight: 600 }}>
+                    {svc.up === undefined ? 'Checking...' : svc.up ? 'Healthy' : 'Down'}
+                  </span>
                 </div>
               </div>
             ))}

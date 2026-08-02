@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import useSWR, { mutate } from 'swr';
 import api from '@/lib/api';
 
 interface Bucket {
@@ -19,6 +20,8 @@ interface FileObject {
   etag: string;
   createdAt: string;
 }
+
+const fetcher = (url: string): Promise<any> => api.get<any>(url);
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';
@@ -44,47 +47,108 @@ function fileIcon(contentType: string) {
   return '📦';
 }
 
-// Mock data for demo
-const MOCK_BUCKETS: Bucket[] = [
-  { id: '1', name: 'my-assets', region: 'us-east-1', isPublic: true, createdAt: '2026-07-01T00:00:00Z' },
-  { id: '2', name: 'private-backups', region: 'us-east-1', isPublic: false, createdAt: '2026-07-10T00:00:00Z' },
-  { id: '3', name: 'media-cdn', region: 'eu-west-1', isPublic: true, createdAt: '2026-07-15T00:00:00Z' },
-];
-
-const MOCK_FILES: FileObject[] = [
-  { id: '1', key: 'images/hero.webp', size: 245760, contentType: 'image/webp', etag: 'abc123', createdAt: '2026-07-20T12:00:00Z' },
-  { id: '2', key: 'videos/demo.mp4', size: 52428800, contentType: 'video/mp4', etag: 'def456', createdAt: '2026-07-20T13:00:00Z' },
-  { id: '3', key: 'docs/readme.pdf', size: 102400, contentType: 'application/pdf', etag: 'ghi789', createdAt: '2026-07-20T14:00:00Z' },
-  { id: '4', key: 'config/settings.json', size: 1024, contentType: 'application/json', etag: 'jkl012', createdAt: '2026-07-21T09:00:00Z' },
-];
+const BUCKETS_PATH = '/v1/storage/buckets';
 
 export default function StoragePage() {
-  const [buckets] = useState<Bucket[]>(MOCK_BUCKETS);
-  const [selectedBucket, setSelectedBucket] = useState<Bucket | null>(null);
-  const [files] = useState<FileObject[]>(MOCK_FILES);
+  const { data: bucketsData } = useSWR<Bucket[]>(BUCKETS_PATH, fetcher, { refreshInterval: 15000 });
+  const buckets: Bucket[] = bucketsData || [];
+
+  const [selectedBucketName, setSelectedBucketName] = useState<string | null>(null);
+  const selectedBucket = buckets.find(b => b.name === selectedBucketName) || null;
+
+  const filesPath = selectedBucket ? `/v1/storage/buckets/${selectedBucket.name}/files` : null;
+  const { data: filesResponse } = useSWR<{ data: FileObject[]; total: number }>(filesPath, fetcher, { refreshInterval: 10000 });
+  const files: FileObject[] = filesResponse?.data || [];
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [newBucketName, setNewBucketName] = useState('');
+  const [newBucketRegion, setNewBucketRegion] = useState('us-east-1');
   const [newBucketPublic, setNewBucketPublic] = useState(false);
   const [creating, setCreating] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [error, setError] = useState('');
 
   const handleCreateBucket = async () => {
     if (!newBucketName) return;
     setCreating(true);
-    setTimeout(() => {
-      setCreating(false);
+    setError('');
+    try {
+      await api.post(BUCKETS_PATH, { name: newBucketName, region: newBucketRegion, isPublic: newBucketPublic });
+      await mutate(BUCKETS_PATH);
       setShowCreateModal(false);
       setNewBucketName('');
-    }, 1200);
+      setNewBucketPublic(false);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to create bucket');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleDeleteBucket = async (bucket: Bucket) => {
+    if (!confirm(`Delete bucket "${bucket.name}"? This only works if it's empty.`)) return;
+    try {
+      await api.delete(`${BUCKETS_PATH}/${bucket.name}`);
+      if (selectedBucketName === bucket.name) setSelectedBucketName(null);
+      await mutate(BUCKETS_PATH);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Failed to delete bucket (is it empty?)');
+    }
   };
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !selectedBucket) return;
     setUploading(true);
-    setTimeout(() => setUploading(false), 1500);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('key', file.name);
+      await api.upload(`/v1/storage/buckets/${selectedBucket.name}/files`, formData);
+      await mutate(filesPath);
+      setShowUploadModal(false);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleDeleteFile = async (file: FileObject) => {
+    if (!selectedBucket || !confirm(`Delete "${file.key}"?`)) return;
+    try {
+      await api.delete(`/v1/storage/buckets/${selectedBucket.name}/files/${encodeURIComponent(file.key)}`);
+      await mutate(filesPath);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Failed to delete file');
+    }
+  };
+
+  const handleDownload = async (file: FileObject) => {
+    if (!selectedBucket) return;
+    try {
+      const { url } = await api.post<{ url: string }>(`/v1/storage/buckets/${selectedBucket.name}/presign`, {
+        key: file.key, expirySeconds: 3600, method: 'GET',
+      });
+      window.open(url, '_blank');
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Failed to generate download link');
+    }
+  };
+
+  const handleCopyLink = async (file: FileObject) => {
+    if (!selectedBucket) return;
+    try {
+      const { url } = await api.post<{ url: string }>(`/v1/storage/buckets/${selectedBucket.name}/presign`, {
+        key: file.key, expirySeconds: 3600, method: 'GET',
+      });
+      await navigator.clipboard.writeText(url);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Failed to generate link');
+    }
   };
 
   return (
@@ -111,7 +175,7 @@ export default function StoragePage() {
             {buckets.map(bucket => (
               <div
                 key={bucket.id}
-                onClick={() => setSelectedBucket(bucket)}
+                onClick={() => setSelectedBucketName(bucket.name)}
                 style={{
                   padding: '14px 20px',
                   borderBottom: '1px solid var(--border-subtle)',
@@ -141,6 +205,11 @@ export default function StoragePage() {
                 </div>
               </div>
             ))}
+            {buckets.length === 0 && (
+              <div style={{ padding: '24px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+                No buckets yet.
+              </div>
+            )}
           </div>
         </div>
 
@@ -163,11 +232,10 @@ export default function StoragePage() {
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <button className="btn btn-secondary btn-sm">⚙️ Settings</button>
                     <button className="btn btn-primary btn-sm" onClick={() => setShowUploadModal(true)}>
                       ↑ Upload
                     </button>
-                    <button className="btn btn-danger btn-sm">🗑️ Delete</button>
+                    <button className="btn btn-danger btn-sm" onClick={() => handleDeleteBucket(selectedBucket)}>🗑️ Delete</button>
                   </div>
                 </div>
               </div>
@@ -212,7 +280,6 @@ export default function StoragePage() {
               <div className="table-container">
                 <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span className="card-title">Files <span className="badge badge-brand" style={{ marginLeft: 8 }}>{files.length}</span></span>
-                  <input className="input" style={{ width: 200 }} placeholder="🔍 Search files..." />
                 </div>
                 <table className="table">
                   <thead>
@@ -236,17 +303,20 @@ export default function StoragePage() {
                         </td>
                         <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{formatBytes(file.size)}</td>
                         <td><span className="badge badge-blue">{file.contentType}</span></td>
-                        <td><code style={{ fontSize: 11, color: 'var(--text-muted)' }}>{file.etag.slice(0, 8)}...</code></td>
+                        <td><code style={{ fontSize: 11, color: 'var(--text-muted)' }}>{file.etag?.slice(0, 8)}...</code></td>
                         <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{formatDate(file.createdAt)}</td>
                         <td>
                           <div style={{ display: 'flex', gap: 6 }}>
-                            <button className="btn btn-secondary btn-sm">↓</button>
-                            <button className="btn btn-secondary btn-sm">🔗</button>
-                            <button className="btn btn-danger btn-sm">🗑️</button>
+                            <button className="btn btn-secondary btn-sm" onClick={() => handleDownload(file)} title="Download">↓</button>
+                            <button className="btn btn-secondary btn-sm" onClick={() => handleCopyLink(file)} title="Copy presigned link">🔗</button>
+                            <button className="btn btn-danger btn-sm" onClick={() => handleDeleteFile(file)} title="Delete">🗑️</button>
                           </div>
                         </td>
                       </tr>
                     ))}
+                    {files.length === 0 && (
+                      <tr><td colSpan={6} style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>No files in this bucket yet.</td></tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -273,6 +343,12 @@ export default function StoragePage() {
             <div className="modal-title">🗄️ Create New Bucket</div>
             <div className="modal-description">Buckets are containers for your files and objects.</div>
 
+            {error && (
+              <div style={{ background: 'var(--red-bg)', color: 'var(--red)', padding: '10px 14px', borderRadius: 8, fontSize: 12.5, marginBottom: 12 }}>
+                {error}
+              </div>
+            )}
+
             <div className="input-group">
               <label className="input-label" htmlFor="bucket-name">Bucket name</label>
               <input
@@ -285,6 +361,14 @@ export default function StoragePage() {
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 5 }}>
                 Lowercase letters, numbers, hyphens and dots only. 3-63 characters.
               </div>
+            </div>
+
+            <div className="input-group">
+              <label className="input-label" htmlFor="bucket-region">Region</label>
+              <select id="bucket-region" className="input" value={newBucketRegion} onChange={(e) => setNewBucketRegion(e.target.value)}>
+                <option value="us-east-1">us-east-1</option>
+                <option value="eu-west-1">eu-west-1</option>
+              </select>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', background: 'var(--bg-elevated)', borderRadius: 8, border: '1px solid var(--border)' }}>

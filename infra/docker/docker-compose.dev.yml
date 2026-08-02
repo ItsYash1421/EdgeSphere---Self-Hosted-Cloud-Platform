@@ -264,6 +264,7 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minio_admin}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minio_secret_123}
       MINIO_USE_SSL: "false"
+      KAFKA_BROKER: kafka:9092
     ports:
       - "${STORAGE_PORT:-8082}:3002"
     depends_on:
@@ -271,6 +272,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+      kafka:
+        condition: service_started
     networks:
       - edgesphere-net
 

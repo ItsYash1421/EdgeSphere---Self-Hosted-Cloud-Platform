@@ -8,6 +8,7 @@ import { AuthController } from './auth.controller';
 import { OAuthController } from './oauth.controller';
 import { AuthService } from './auth.service';
 import { UserEntity } from '../users/user.entity';
+import { ApiKeyEntity } from './api-key.entity';
 import { UsersModule } from '../users/users.module';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { GoogleStrategy } from './strategies/google.strategy';
@@ -15,7 +16,7 @@ import { GithubStrategy } from './strategies/github.strategy';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([UserEntity]),
+    TypeOrmModule.forFeature([UserEntity, ApiKeyEntity]),
     UsersModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({

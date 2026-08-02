@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import useSWR, { mutate } from 'swr';
+import api from '@/lib/api';
 
 interface ApiKey {
   id: string;
@@ -11,10 +13,8 @@ interface ApiKey {
   expiresAt: string | null;
 }
 
-const MOCK_KEYS: ApiKey[] = [
-  { id: '1', name: 'Production App', keyPrefix: 'esk_a1b2c3d4', createdAt: '2026-07-01T00:00:00Z', lastUsedAt: '2026-07-21T12:00:00Z', expiresAt: null },
-  { id: '2', name: 'CI/CD Pipeline', keyPrefix: 'esk_e5f6g7h8', createdAt: '2026-07-10T00:00:00Z', lastUsedAt: '2026-07-21T09:30:00Z', expiresAt: '2026-12-31T00:00:00Z' },
-];
+const KEYS_PATH = '/v1/auth/api-keys';
+const fetcher = (url: string): Promise<ApiKey[]> => api.get<ApiKey[]>(url);
 
 function formatDate(d: string | null) {
   if (!d) return 'Never';
@@ -32,27 +32,29 @@ function relativeTime(d: string | null) {
 }
 
 export default function ApiKeysPage() {
-  const [keys, setKeys] = useState<ApiKey[]>(MOCK_KEYS);
+  const { data: keysData } = useSWR<ApiKey[]>(KEYS_PATH, fetcher, { refreshInterval: 15000 });
+  const keys: ApiKey[] = keysData || [];
+
   const [showCreate, setShowCreate] = useState(false);
   const [newKeyName, setNewKeyName] = useState('');
   const [newKeyResult, setNewKeyResult] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!newKeyName) return;
     setCreating(true);
-    setTimeout(() => {
-      const fakeKey = `esk_${Math.random().toString(36).slice(2, 10)}${Math.random().toString(36).slice(2, 10)}`;
-      setNewKeyResult(fakeKey);
+    setError('');
+    try {
+      const result = await api.post<{ key: string }>(KEYS_PATH, { name: newKeyName });
+      setNewKeyResult(result.key);
+      await mutate(KEYS_PATH);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to create key');
+    } finally {
       setCreating(false);
-      setKeys(prev => [{
-        id: String(Date.now()), name: newKeyName,
-        keyPrefix: fakeKey.slice(0, 12),
-        createdAt: new Date().toISOString(),
-        lastUsedAt: null, expiresAt: null
-      }, ...prev]);
-    }, 1000);
+    }
   };
 
   const copyKey = (key: string) => {
@@ -61,8 +63,14 @@ export default function ApiKeysPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleRevoke = (id: string) => {
-    setKeys(prev => prev.filter(k => k.id !== id));
+  const handleRevoke = async (id: string) => {
+    if (!confirm('Revoke this API key? Any integrations using it will stop working immediately.')) return;
+    try {
+      await api.delete(`${KEYS_PATH}/${id}`);
+      await mutate(KEYS_PATH);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Failed to revoke key');
+    }
   };
 
   return (
@@ -72,7 +80,7 @@ export default function ApiKeysPage() {
           <h1 className="page-title">API Keys</h1>
           <p className="page-subtitle">Manage API keys for programmatic access to EdgeSphere</p>
         </div>
-        <button className="btn btn-primary" onClick={() => { setShowCreate(true); setNewKeyResult(null); }}>
+        <button className="btn btn-primary" onClick={() => { setShowCreate(true); setNewKeyResult(null); setError(''); }}>
           + New API Key
         </button>
       </div>
@@ -179,6 +187,12 @@ curl https://api.edgesphere.local/v1/storage/buckets/my-assets/presign \\
               <>
                 <div className="modal-title">🔑 Create API Key</div>
                 <div className="modal-description">Give your key a descriptive name to identify its use.</div>
+
+                {error && (
+                  <div style={{ background: 'var(--red-bg)', color: 'var(--red)', padding: '10px 14px', borderRadius: 8, fontSize: 12.5, marginBottom: 12 }}>
+                    {error}
+                  </div>
+                )}
 
                 <div className="input-group">
                   <label className="input-label" htmlFor="key-name">Key name</label>

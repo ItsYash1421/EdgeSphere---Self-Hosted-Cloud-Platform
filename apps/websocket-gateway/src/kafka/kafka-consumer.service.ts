@@ -5,12 +5,22 @@ import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import { EventsGateway } from '../events/events.gateway';
 
+interface RecentRequestSample {
+  receivedAt: number;
+  latencyMs: number;
+  cacheHit: boolean;
+  status: number;
+}
+
+const METRICS_WINDOW_MS = 5000;
+
 @Injectable()
 export class KafkaConsumerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(KafkaConsumerService.name);
   private kafka: Kafka;
   private consumer: any;
   private metricsInterval: NodeJS.Timeout;
+  private recentRequests: RecentRequestSample[] = [];
 
   constructor(
     private readonly configService: ConfigService,
@@ -35,7 +45,15 @@ export class KafkaConsumerService implements OnModuleInit, OnModuleDestroy {
           if (!message.value) return;
           try {
             const data = JSON.parse(message.value.toString());
-            if (topic === 'request.events') this.eventsGateway.emitRequestEvent(data);
+            if (topic === 'request.events') {
+              this.eventsGateway.emitRequestEvent(data);
+              this.recentRequests.push({
+                receivedAt: Date.now(),
+                latencyMs: data.latencyMs || 0,
+                cacheHit: !!data.cacheHit,
+                status: data.status || 0,
+              });
+            }
             else if (topic === 'storage.events') this.eventsGateway.emitStorageEvent(data);
             else if (topic === 'alerts.triggered') this.eventsGateway.emitAlert(data);
           } catch (err) {
@@ -62,18 +80,25 @@ export class KafkaConsumerService implements OnModuleInit, OnModuleDestroy {
   }
 
   startMetricsEmitter() {
-    this.metricsInterval = setInterval(async () => {
-      // Simulate real metrics computation for now
+    this.metricsInterval = setInterval(() => {
+      const cutoff = Date.now() - METRICS_WINDOW_MS;
+      this.recentRequests = this.recentRequests.filter((r) => r.receivedAt >= cutoff);
+
+      const total = this.recentRequests.length;
+      const hits = this.recentRequests.filter((r) => r.cacheHit).length;
+      const errors = this.recentRequests.filter((r) => r.status >= 400).length;
+      const latencySum = this.recentRequests.reduce((sum, r) => sum + r.latencyMs, 0);
+
       const metrics = {
-        requestsPerSec: Math.random() * 100,
-        cacheHitRatio: Math.random(),
-        avgLatencyMs: Math.random() * 50,
+        requestsPerSec: total / (METRICS_WINDOW_MS / 1000),
+        cacheHitRatio: total > 0 ? hits / total : 0,
+        avgLatencyMs: total > 0 ? latencySum / total : 0,
         activeConnections: this.eventsGateway.getConnectedClientsCount(),
-        errorRate: Math.random() * 0.05,
+        errorRate: total > 0 ? errors / total : 0,
         timestamp: new Date().toISOString()
       };
       this.eventsGateway.emitMetricsUpdate(metrics);
-    }, 5000);
+    }, METRICS_WINDOW_MS);
   }
 
   async onModuleDestroy() {

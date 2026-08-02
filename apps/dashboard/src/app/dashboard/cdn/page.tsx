@@ -1,12 +1,34 @@
 'use client';
 
 import React, { useState } from 'react';
+import useSWR, { mutate } from 'swr';
+import api from '@/lib/api';
+
+const fetcher = (url: string): Promise<any> => api.get<any>(url);
+
+function formatBytes(bytes: number): string {
+  if (!bytes) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+}
+
+const CACHE_STATS_PATH = '/v1/cache/stats';
+const CACHE_HISTORY_PATH = '/v1/cache/history';
+const CACHE_RATIO_PATH = '/v1/analytics/cache/ratio?window=1440';
 
 export default function CDNPage() {
+  const { data: cacheStats } = useSWR<{ totalKeys: number; memoryUsed: string }>(CACHE_STATS_PATH, fetcher, { refreshInterval: 15000 });
+  const { data: cacheRatio } = useSWR<{ hitRatio: number; hits: number; misses: number; cachedBytes: number }>(CACHE_RATIO_PATH, fetcher, { refreshInterval: 15000 });
+  const { data: purgeHistory } = useSWR<any[]>(CACHE_HISTORY_PATH, fetcher, { refreshInterval: 10000 });
+
   const [purgeType, setPurgeType] = useState('file');
   const [bucket, setBucket] = useState('');
   const [key, setKey] = useState('');
+  const [purging, setPurging] = useState(false);
   const [purgeResult, setPurgeResult] = useState<any>(null);
+  const [purgeError, setPurgeError] = useState('');
 
   // Image demo
   const [demoBucket, setDemoBucket] = useState('my-bucket');
@@ -17,12 +39,27 @@ export default function CDNPage() {
 
   const handlePurge = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate API call
-    setPurgeResult({
-      keysDeleted: purgeType === 'all' ? 1250 : purgeType === 'bucket' ? 42 : 1,
-      regions: ['us-east-1', 'eu-west-1'],
-      timeMs: 45
-    });
+    setPurging(true);
+    setPurgeError('');
+    try {
+      let result;
+      if (purgeType === 'all') {
+        result = await api.delete<any>('/v1/cache/purge/all');
+      } else if (purgeType === 'bucket') {
+        result = await api.post<any>('/v1/cache/purge/bucket', { bucket });
+      } else if (purgeType === 'prefix') {
+        result = await api.post<any>('/v1/cache/purge/prefix', { bucket, prefix: key });
+      } else {
+        result = await api.post<any>('/v1/cache/purge', { bucket, key });
+      }
+      setPurgeResult(result);
+      await mutate(CACHE_HISTORY_PATH);
+      await mutate(CACHE_STATS_PATH);
+    } catch (err: unknown) {
+      setPurgeError(err instanceof Error ? err.message : 'Purge failed');
+    } finally {
+      setPurging(false);
+    }
   };
 
   const getUrl = () => {
@@ -30,8 +67,16 @@ export default function CDNPage() {
     if (demoW) params.append('w', demoW);
     if (demoFmt) params.append('fmt', demoFmt);
     if (demoQ) params.append('q', demoQ);
-    return `http://localhost:8080/cdn/${demoBucket}/${demoKey}?${params.toString()}`;
+    const cdnUrl = process.env.NEXT_PUBLIC_CDN_URL || 'http://localhost:8080';
+    return `${cdnUrl}/cdn/${demoBucket}/${demoKey}?${params.toString()}`;
   };
+
+  const overviewStats = [
+    { label: 'Total Cached Keys', value: cacheStats ? cacheStats.totalKeys.toLocaleString() : '—' },
+    { label: 'Cache Hit Ratio', value: cacheRatio ? `${(cacheRatio.hitRatio * 100).toFixed(1)}%` : '—' },
+    { label: 'Cache Memory Used', value: cacheStats ? cacheStats.memoryUsed : '—' },
+    { label: 'Bandwidth Served from Cache', value: cacheRatio ? formatBytes(cacheRatio.cachedBytes) : '—' },
+  ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -42,12 +87,7 @@ export default function CDNPage() {
 
       {/* Overview Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-        {[
-          { label: 'Total Cached Files', value: '1.4M' },
-          { label: 'Cache Hit Ratio', value: '84.2%' },
-          { label: 'Cache Size', value: '24.5 GB' },
-          { label: 'Bandwidth Saved', value: '1.2 TB' },
-        ].map(stat => (
+        {overviewStats.map(stat => (
           <div key={stat.label} style={{
             background: 'var(--bg-surface)', border: '1px solid var(--border)',
             borderRadius: 'var(--radius-md)', padding: '16px'
@@ -68,9 +108,9 @@ export default function CDNPage() {
           <form onSubmit={handlePurge} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <label style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Purge Type</label>
-              <select 
-                className="input" 
-                value={purgeType} 
+              <select
+                className="input"
+                value={purgeType}
                 onChange={(e) => setPurgeType(e.target.value)}
                 style={{ width: '100%' }}
               >
@@ -84,9 +124,9 @@ export default function CDNPage() {
             {purgeType !== 'all' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <label style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Bucket Name</label>
-                <input 
-                  className="input" 
-                  placeholder="e.g. assets-prod" 
+                <input
+                  className="input"
+                  placeholder="e.g. assets-prod"
                   value={bucket}
                   onChange={(e) => setBucket(e.target.value)}
                   style={{ width: '100%' }}
@@ -98,9 +138,9 @@ export default function CDNPage() {
             {(purgeType === 'file' || purgeType === 'prefix') && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <label style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Key / Path</label>
-                <input 
-                  className="input" 
-                  placeholder="e.g. images/hero.png" 
+                <input
+                  className="input"
+                  placeholder="e.g. images/hero.png"
                   value={key}
                   onChange={(e) => setKey(e.target.value)}
                   style={{ width: '100%' }}
@@ -115,12 +155,19 @@ export default function CDNPage() {
               </div>
             )}
 
-            <button type="submit" className="btn" style={{ 
-              background: 'var(--red)', color: '#fff', border: 'none', 
-              padding: '10px', fontSize: '14px', fontWeight: 600, 
-              cursor: 'pointer', borderRadius: 'var(--radius-sm)'
+            {purgeError && (
+              <div style={{ padding: '12px', background: 'var(--red-bg)', color: 'var(--red)', borderRadius: 'var(--radius-sm)', fontSize: '13px' }}>
+                {purgeError}
+              </div>
+            )}
+
+            <button type="submit" disabled={purging} className="btn" style={{
+              background: 'var(--red)', color: '#fff', border: 'none',
+              padding: '10px', fontSize: '14px', fontWeight: 600,
+              cursor: purging ? 'default' : 'pointer', borderRadius: 'var(--radius-sm)',
+              opacity: purging ? 0.7 : 1,
             }}>
-              🗑️ Purge Cache
+              {purging ? 'Purging...' : '🗑️ Purge Cache'}
             </button>
           </form>
 
@@ -129,8 +176,7 @@ export default function CDNPage() {
               <div style={{ fontSize: '13px', color: 'var(--green)', fontWeight: 600, marginBottom: '8px' }}>✓ Purge Successful</div>
               <div style={{ fontSize: '13px', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <div>Keys deleted: <span style={{ color: 'var(--text-primary)' }}>{purgeResult.keysDeleted}</span></div>
-                <div>Regions affected: <span style={{ color: 'var(--text-primary)' }}>{purgeResult.regions.join(', ')}</span></div>
-                <div>Time taken: <span style={{ color: 'var(--text-primary)' }}>{purgeResult.timeMs}ms</span></div>
+                {purgeResult.regions && <div>Regions affected: <span style={{ color: 'var(--text-primary)' }}>{purgeResult.regions.join(', ')}</span></div>}
               </div>
             </div>
           )}
@@ -142,8 +188,16 @@ export default function CDNPage() {
           borderRadius: 'var(--radius-md)', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px'
         }}>
           <h2 style={{ fontSize: '16px', margin: '0', color: 'var(--text-primary)' }}>Image Optimization Demo</h2>
-          
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div>
+              <label style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Bucket</label>
+              <input className="input" value={demoBucket} onChange={e => setDemoBucket(e.target.value)} style={{ width: '100%' }} />
+            </div>
+            <div>
+              <label style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Key</label>
+              <input className="input" value={demoKey} onChange={e => setDemoKey(e.target.value)} style={{ width: '100%' }} />
+            </div>
             <div>
               <label style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Width</label>
               <input className="input" type="number" value={demoW} onChange={e => setDemoW(e.target.value)} style={{ width: '100%' }} />
@@ -167,9 +221,9 @@ export default function CDNPage() {
             <code style={{ fontSize: '11px', color: 'var(--text-primary)', wordBreak: 'break-all' }}>
               {getUrl()}
             </code>
-            <button 
+            <button
               type="button"
-              className="btn btn-secondary btn-sm" 
+              className="btn btn-secondary btn-sm"
               style={{ marginTop: '8px' }}
               onClick={() => navigator.clipboard.writeText(getUrl())}
             >
@@ -177,9 +231,13 @@ export default function CDNPage() {
             </button>
           </div>
 
-          <div style={{ border: '1px dashed var(--border)', borderRadius: 'var(--radius-sm)', height: '120px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
-            Preview Placeholder
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={getUrl()}
+            alt="CDN preview"
+            style={{ border: '1px dashed var(--border)', borderRadius: 'var(--radius-sm)', maxHeight: 160, objectFit: 'contain', width: '100%', background: 'var(--bg-elevated)' }}
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+          />
         </div>
       </div>
 
@@ -198,32 +256,27 @@ export default function CDNPage() {
               <th style={{ padding: '12px 20px', fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>Type</th>
               <th style={{ padding: '12px 20px', fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>Target</th>
               <th style={{ padding: '12px 20px', fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>Keys Deleted</th>
-              <th style={{ padding: '12px 20px', fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>Duration</th>
             </tr>
           </thead>
           <tbody>
-            {[
-              { time: '2 mins ago', type: 'file', target: 'assets/hero.png', keys: 1, duration: '45ms', color: 'var(--green)' },
-              { time: '1 hour ago', type: 'bucket', target: 'public-images', keys: 142, duration: '210ms', color: 'var(--yellow)' },
-              { time: '3 hours ago', type: 'all', target: 'Global', keys: 8420, duration: '850ms', color: 'var(--red)' },
-              { time: '1 day ago', type: 'prefix', target: 'assets/css/*', keys: 14, duration: '82ms', color: 'var(--green)' },
-              { time: '2 days ago', type: 'file', target: 'docs/api.json', keys: 1, duration: '34ms', color: 'var(--green)' },
-            ].map((row, i) => (
-              <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
-                <td style={{ padding: '12px 20px', fontSize: '13px', color: 'var(--text-primary)' }}>{row.time}</td>
+            {(purgeHistory || []).map((row: any) => (
+              <tr key={row.purgeId} style={{ borderBottom: '1px solid var(--border)' }}>
+                <td style={{ padding: '12px 20px', fontSize: '13px', color: 'var(--text-primary)' }}>{new Date(row.timestamp).toLocaleString()}</td>
                 <td style={{ padding: '12px 20px', fontSize: '13px' }}>
-                  <span style={{ 
-                    padding: '2px 8px', borderRadius: '12px', fontSize: '11px', 
-                    background: `${row.color}20`, color: row.color, border: `1px solid ${row.color}40`
+                  <span style={{
+                    padding: '2px 8px', borderRadius: '12px', fontSize: '11px',
+                    background: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border)'
                   }}>
                     {row.type}
                   </span>
                 </td>
-                <td style={{ padding: '12px 20px', fontSize: '13px', color: 'var(--text-secondary)' }}>{row.target}</td>
-                <td style={{ padding: '12px 20px', fontSize: '13px', color: 'var(--text-primary)' }}>{row.keys}</td>
-                <td style={{ padding: '12px 20px', fontSize: '13px', color: 'var(--text-secondary)' }}>{row.duration}</td>
+                <td style={{ padding: '12px 20px', fontSize: '13px', color: 'var(--text-secondary)' }}>{row.bucket || row.prefix || 'Global'}{row.key ? `/${row.key}` : ''}</td>
+                <td style={{ padding: '12px 20px', fontSize: '13px', color: 'var(--text-primary)' }}>{row.keysDeleted}</td>
               </tr>
             ))}
+            {(!purgeHistory || purgeHistory.length === 0) && (
+              <tr><td colSpan={4} style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>No purges yet.</td></tr>
+            )}
           </tbody>
         </table>
       </div>

@@ -62,12 +62,13 @@ export class AnalyticsService {
     return result.map((row: any) => ({ t: row.t, value: parseInt(row.value, 10) }));
   }
 
-  async getCacheHitRatio(windowMinutes: number = 60): Promise<{ hitRatio: number; hits: number; misses: number }> {
+  async getCacheHitRatio(windowMinutes: number = 60): Promise<{ hitRatio: number; hits: number; misses: number; cachedBytes: number }> {
     const query = `
-      SELECT 
-        SUM(CASE WHEN cache_hit THEN 1 ELSE 0 END)::integer as hits, 
-        COUNT(*)::integer as total
-      FROM request_events 
+      SELECT
+        SUM(CASE WHEN cache_hit THEN 1 ELSE 0 END)::integer as hits,
+        COUNT(*)::integer as total,
+        SUM(bytes) FILTER (WHERE cache_hit)::bigint as cached_bytes
+      FROM request_events
       WHERE time > NOW() - INTERVAL '${windowMinutes} minutes'
     `;
     const result = await this.repository.query(query);
@@ -75,8 +76,9 @@ export class AnalyticsService {
     const total = parseInt(result[0].total || '0', 10);
     const misses = total - hits;
     const hitRatio = total > 0 ? hits / total : 0;
-    
-    return { hitRatio, hits, misses };
+    const cachedBytes = parseInt(result[0].cached_bytes || '0', 10);
+
+    return { hitRatio, hits, misses, cachedBytes };
   }
 
   async getLatencyPercentiles(windowMinutes: number = 60): Promise<{ p50: number; p95: number; p99: number }> {
@@ -216,9 +218,113 @@ export class AnalyticsService {
     };
   }
 
+  private mapEventRow(row: any): RequestEventEntity {
+    return {
+      time: row.time,
+      service: row.service,
+      method: row.method,
+      path: row.path,
+      status: row.status,
+      latencyMs: row.latency_ms,
+      userId: row.user_id,
+      ip: row.ip,
+      country: row.country,
+      cacheHit: row.cache_hit,
+      bytes: row.bytes,
+      edgeRegion: row.edge_region,
+      requestId: row.request_id,
+    };
+  }
+
   async getRecentEvents(limit: number = 50): Promise<RequestEventEntity[]> {
     const query = `SELECT * FROM request_events ORDER BY time DESC LIMIT $1`;
     const result = await this.repository.query(query, [limit]);
-    return result;
+    return result.map((row: any) => this.mapEventRow(row));
+  }
+
+  async searchEvents(filters: {
+    method?: string;
+    service?: string;
+    statusClass?: '2xx' | '3xx' | '4xx' | '5xx';
+    query?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ data: RequestEventEntity[]; total: number }> {
+    const conditions: string[] = [];
+    const params: any[] = [];
+
+    if (filters.method) {
+      params.push(filters.method);
+      conditions.push(`method = $${params.length}`);
+    }
+    if (filters.service) {
+      params.push(filters.service);
+      conditions.push(`service = $${params.length}`);
+    }
+    if (filters.statusClass) {
+      const base = parseInt(filters.statusClass[0], 10) * 100;
+      params.push(base, base + 100);
+      conditions.push(`status >= $${params.length - 1} AND status < $${params.length}`);
+    }
+    if (filters.query) {
+      params.push(`%${filters.query}%`);
+      const p = params.length;
+      conditions.push(`(path ILIKE $${p} OR ip::text ILIKE $${p} OR request_id::text ILIKE $${p})`);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    const limit = Math.min(filters.limit ?? 50, 200);
+    const offset = filters.offset ?? 0;
+
+    const dataQuery = `SELECT * FROM request_events ${whereClause} ORDER BY time DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+    const countQuery = `SELECT COUNT(*)::integer as total FROM request_events ${whereClause}`;
+
+    const [data, countResult] = await Promise.all([
+      this.repository.query(dataQuery, [...params, limit, offset]),
+      this.repository.query(countQuery, params),
+    ]);
+
+    return { data: data.map((row: any) => this.mapEventRow(row)), total: countResult[0]?.total ?? 0 };
+  }
+
+  async getCacheHitRatioTimeSeries(windowMinutes: number = 60): Promise<TimeSeriesPoint[]> {
+    const query = `
+      SELECT
+        time_bucket('1 minute', time) AS t,
+        ROUND(AVG(cache_hit::int) * 100)::integer AS value
+      FROM request_events
+      WHERE time > NOW() - INTERVAL '${windowMinutes} minutes'
+      GROUP BY t ORDER BY t
+    `;
+    const result = await this.repository.query(query);
+    return result.map((row: any) => ({ t: row.t, value: parseInt(row.value || '0', 10) }));
+  }
+
+  async getEdgeStats(windowMinutes: number = 60): Promise<{
+    region: string;
+    requests: number;
+    cacheHitRatio: number;
+    avgLatencyMs: number;
+    lastSeen: string;
+  }[]> {
+    const query = `
+      SELECT
+        edge_region AS region,
+        COUNT(*)::integer AS requests,
+        ROUND(AVG(cache_hit::int), 4)::float AS cache_hit_ratio,
+        AVG(latency_ms) AS avg_latency_ms,
+        MAX(time) AS last_seen
+      FROM request_events
+      WHERE time > NOW() - INTERVAL '${windowMinutes} minutes' AND edge_region IS NOT NULL
+      GROUP BY edge_region ORDER BY requests DESC
+    `;
+    const result = await this.repository.query(query);
+    return result.map((row: any) => ({
+      region: row.region,
+      requests: parseInt(row.requests, 10),
+      cacheHitRatio: parseFloat(row.cache_hit_ratio || '0'),
+      avgLatencyMs: parseFloat(row.avg_latency_ms || '0'),
+      lastSeen: row.last_seen,
+    }));
   }
 }
