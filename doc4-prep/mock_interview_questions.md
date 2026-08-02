@@ -69,5 +69,106 @@ I solved this by writing a custom bash script that forces Docker to build the im
 
 ---
 
+## Part 5: Trade-offs & "What Would You Improve" (the questions that separate senior from mid-level)
+
+These are grounded in real, verified limitations in the current codebase — not hypotheticals. Being
+able to name your own system's weak points, unprompted, is one of the strongest signals you can give
+in an interview. Full technical detail on each is in `subsystems_deep_dive.md`.
+
+### 11. "Is your token bucket rate limiter actually safe under concurrent requests?"
+**Honest answer (this is a real gap, not a trick question):**
+"No, not currently. It's a Redis `HMGET` → compute in application code → `HMSET`, which is a
+read-modify-write, not an atomic operation. Two requests from the same identifier arriving within the
+same few milliseconds could both read the same token count before either writes back, and both get
+admitted — a classic check-then-act race condition. My sliding-window limiter doesn't have this
+problem because it's a single Redis `pipeline` of `ZADD`/`ZREMRANGEBYSCORE`/`ZCARD` — pipelined
+commands execute back-to-back on the Redis server without another client's commands interleaving. The
+fix for the token bucket is moving the read-compute-write into a Lua script so Redis executes it
+atomically server-side, or using `HINCRBYFLOAT` instead of a full read first."
+
+### 12. "You verify the JWT in two different places — gateway and auth-service. Isn't that redundant?"
+**Answer:**
+"It looks redundant until you consider the threat model. The gateway's check is perimeter security —
+it's the only thing the public internet can reach. auth-service's own `JwtAuthGuard` on routes like
+`/auth/me` is defense-in-depth *inside* the Docker network — if the gateway's route-exclusion list
+were ever misconfigured, or if another internal service called auth-service directly instead of
+through the gateway, those routes are still independently protected. 'Never trust the network' is a
+deliberate microservices principle, not just 'trust the edge and relax everywhere else.'"
+
+### 13. "Your architecture docs describe a Go-based edge server with disk caching. I don't see that running anywhere."
+**Answer:**
+"Good catch — that's real drift I found and fixed while auditing the project. The Go edge server
+(`apps/edge-server/`) is an early prototype that's never been part of the actual `docker-compose`
+stack. What's actually deployed is `cdn-service`, a NestJS service using `sharp` for image
+transforms, with a two-tier cache: an in-process `NodeCache` per instance, then Redis shared across
+instances, then MinIO as origin. I updated `docs/ARCHITECTURE.md` to document what's actually running
+instead of leaving stale docs that would mislead the next person — including me, six months from now."
+
+### 14. "Your alert rules — are they persisted anywhere, or do they reset if the service restarts?"
+**Answer:**
+"They're in-memory only right now (`notification-service`'s `AlertsService` holds them in a plain
+array seeded from `DEFAULT_ALERT_RULES`). A restart resets any custom rules a user created back to
+the defaults. That's a real limitation I'd fix before calling this production-ready — either a
+Postgres table (consistent with how everything else in the platform persists) or, if I wanted
+sub-millisecond reads on every alert-check tick, Redis with a periodic snapshot to Postgres so a
+restart doesn't lose custom rules."
+
+### 15. "How would you scale the rate limiter itself if Redis became the bottleneck?"
+**Answer:**
+"Two levers, depending on what's actually saturating: if it's Redis CPU from too many small
+operations, shard the rate-limit keyspace across multiple Redis instances by hashing the identifier
+(consistent hashing so most keys don't move if I add a shard). If it's network round-trips from the
+gateway to Redis under high fan-out, I'd add a short-lived local cache in the gateway itself — e.g.,
+if a client is already well under their limit, skip the Redis round-trip for N milliseconds and just
+count locally, reconciling periodically. That trades a small amount of rate-limit precision for a lot
+less Redis load, which is usually the right trade for a limiter (being briefly too generous is a much
+smaller risk than adding latency to every request)."
+
+---
+
+## Part 6: Questions specifically about the real-data-integration debugging session
+
+If your resume or project walkthrough mentions "found and fixed production bugs," expect these.
+Full write-ups with code are in `real_data_integration_debugging.md`.
+
+### 16. "Walk me through the most subtle bug you've found in this codebase."
+**Answer:**
+"A TypeORM entity (`RequestEventEntity.userId`) was missing its database column-name mapping —
+every sibling column had `@Column({ name: 'snake_case_name' })`, this one didn't. It never surfaced
+because every *read* query in that service was hand-written raw SQL, which bypasses entity metadata
+entirely. It only broke the moment I added a method using TypeORM's query builder for an *insert* —
+which does validate against metadata — and then every Kafka-consumed event silently failed to persist
+inside a `try/catch` that just logged and moved on. The result: the table backing the entire
+real-time-analytics dashboard had been empty since the service was first stood up, and nothing about
+the failure was visible from the UI or from 90% of the codebase. I found it by tracing every
+dashboard page's data back to its actual origin — REST call → controller → service → raw SQL → DB
+row — rather than trusting that a rendered chart meant the underlying data was real."
+
+### 17. "How do you decide when a bug fix is safe versus when you're just papering over a symptom?"
+**Answer:**
+"A gateway Kafka producer disconnected mid-session and never reconnected — kafkajs doesn't
+auto-reconnect a torn-down producer, and nothing was polling connection state. The immediate fix was
+operational: restart the container so `onModuleInit` re-ran against a healthy broker. That's a real
+fix for the immediate outage, but it's not a fix for the underlying gap — the service *should* detect
+a dead producer and either reconnect or fail its health check so something pages a human. I documented
+that as a known follow-up rather than pretending the restart solved the root cause. I try to be
+explicit with myself about which category a fix falls into, because conflating 'the symptom is gone'
+with 'the defect is fixed' is how the same class of bug comes back later."
+
+### 18. "You mentioned a package worked locally but failed in Docker. Explain that to someone who doesn't know pnpm."
+**Answer:**
+"Two services imported the `express` package directly in their source code, but never listed it as a
+dependency in their own `package.json` — they only got it transitively, through `@nestjs/
+platform-express` depending on it. Most package managers hoist all transitive dependencies into one
+flat `node_modules`, so `require('express')` finds it anyway even though it's not *your* declared
+dependency — that's what happened locally. pnpm, by default, does the opposite: strict, non-flattened
+linking, where a package can only `require()` what it explicitly lists as its own dependency. That's
+usually a feature — it stops exactly this kind of implicit coupling — but it means the bug only
+appears inside the Docker build, which uses a clean install, not on a developer's machine that already
+has a stale, more permissive `node_modules` sitting around. The fix was two lines per service: declare
+`express` as a direct dependency at the version already being resolved transitively."
+
+---
+
 ## 💡 Interview Strategy Tip
-If the interviewer asks an open-ended question like *"Tell me about a time you solved a hard technical problem"*, use the **Docker Sequential Build Issue** (Question 9) or the **5GB File Upload Issue** (Question 4). These show that you don't just write code, but you understand system limitations (Networking, Memory, CPU) and can architect real-world solutions.
+If the interviewer asks an open-ended question like *"Tell me about a time you solved a hard technical problem"*, use the **Docker Sequential Build Issue** (Question 9), the **5GB File Upload Issue** (Question 4), or — if they want something more recent and more "I own this system end-to-end" — **Question 16** (the silent analytics-ingestion bug). If they push into "what's not perfect about your own system," Part 5 is built exactly for that — naming a real race condition in your own rate limiter unprompted is a far stronger signal than claiming the system has no weaknesses.
