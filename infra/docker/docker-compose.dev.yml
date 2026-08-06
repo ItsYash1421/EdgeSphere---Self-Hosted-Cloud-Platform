@@ -345,11 +345,14 @@ services:
       KAFKA_CLIENT_ID: notification-service
       KAFKA_GROUP_ID: notification-group
       ANALYTICS_SERVICE_URL: http://edgesphere-analytics:3003
-      SMTP_HOST: smtp.ethereal.email
+      SMTP_HOST: live.smtp.mailtrap.io
       SMTP_PORT: "587"
-      SMTP_FROM: alerts@edgesphere.local
-      ALERT_EMAIL_TO: admin@edgesphere.local
-      WEBHOOK_URL: http://edgesphere-gateway:3000/internal/webhooks
+      SMTP_USER: api
+      SMTP_PASS: 657779b535d9fe832eaee8b284c8fd83
+      SMTP_FROM: hello@demomailtrap.co
+      ALERT_EMAIL_TO: yashamanmeena2@gmail.com
+      # Free public testing webhook that always returns 200 OK
+      WEBHOOK_URL: https://httpbin.org/post
       ALERT_CHECK_INTERVAL_SECONDS: "60"
       ALERT_DEBOUNCE_MINUTES: "10"
     ports:

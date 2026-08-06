@@ -174,7 +174,7 @@ export default function AlertsPage() {
                 <TableCell className="text-xs">{hist.value} / {hist.threshold}</TableCell>
                 <TableCell>
                   <span className={cn('text-xs font-semibold', hist.status === 'triggered' ? 'text-red-500' : 'text-emerald-500')}>
-                    {hist.status.toUpperCase()}
+                    {hist.status?.toUpperCase() || 'UNKNOWN'}
                   </span>
                 </TableCell>
                 <TableCell className="text-xs text-muted-foreground">{hist.channels?.join(', ')}</TableCell>
@@ -205,12 +205,12 @@ export default function AlertsPage() {
             {nHistory.map((notif: any, i: number) => (
               <TableRow key={i}>
                 <TableCell className="text-xs text-muted-foreground">{new Date(notif.timestamp).toLocaleString()}</TableCell>
-                <TableCell className="text-xs">{notif.channel}</TableCell>
-                <TableCell className="text-xs">{notif.recipient}</TableCell>
+                <TableCell className="text-xs">{notif.channels?.join(', ') || 'N/A'}</TableCell>
+                <TableCell className="text-xs">-</TableCell>
                 <TableCell>
                   <span className={cn('text-xs font-semibold', notif.status === 'success' ? 'text-emerald-500' : 'text-red-500')}>{notif.status}</span>
                 </TableCell>
-                <TableCell className="max-w-[300px] truncate text-xs text-muted-foreground">{notif.message}</TableCell>
+                <TableCell className="max-w-[300px] truncate text-xs text-muted-foreground">{notif.error || 'Dispatched via configured channels'}</TableCell>
               </TableRow>
             ))}
             {nHistory.length === 0 && (
