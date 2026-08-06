@@ -144,11 +144,18 @@ export class AuthService {
     const rawKey = `esk_${uuidv4().replace(/-/g, '')}`;
     const keyHash = await bcrypt.hash(rawKey, 10);
     const keyPrefix = rawKey.substring(0, 12);
+    // SHA256 of raw key → used for fast O(1) Redis lookup during validation
+    const sha256 = crypto.createHash('sha256').update(rawKey).digest('hex');
 
     const record = this.apiKeysRepo.create({ userId, name, keyHash, keyPrefix, lastUsedAt: null, expiresAt: null });
     const saved = await this.apiKeysRepo.save(record);
 
-    await this.redis.set(`apikey:${keyHash}`, userId, 'EX', 60 * 60 * 24 * 365);
+    // Fast-lookup key: sha256(rawKey) → JSON with userId + keyId
+    await this.redis.set(
+      `apikey:lookup:${sha256}`,
+      JSON.stringify({ userId, keyId: saved.id }),
+      'EX', 60 * 60 * 24 * 365,
+    );
 
     logger.info({ userId, name }, 'API key created');
     return {
@@ -178,9 +185,62 @@ export class AuthService {
     const key = await this.apiKeysRepo.findOne({ where: { id: keyId, userId } });
     if (!key) throw new NotFoundException('API key not found');
 
+    // Scan for the sha256 lookup key — we stored it under apikey:lookup:* on creation.
+    // We don't have the raw key anymore, so scan by keyId pattern.
+    // For new keys the lookup key is stored; for old keys just remove the bcrypt key.
     await this.redis.del(`apikey:${key.keyHash}`);
+    // Purge sha256 lookup keys for this keyId
+    const stream = this.redis.scanStream({ match: 'apikey:lookup:*', count: 100 });
+    const toDelete: string[] = [];
+    await new Promise<void>((resolve, reject) => {
+      stream.on('data', async (keys: string[]) => {
+        for (const k of keys) {
+          const val = await this.redis.get(k);
+          if (val) {
+            try {
+              const parsed = JSON.parse(val);
+              if (parsed.keyId === keyId) toDelete.push(k);
+            } catch {}
+          }
+        }
+      });
+      stream.on('end', resolve);
+      stream.on('error', reject);
+    });
+    if (toDelete.length > 0) await this.redis.del(...toDelete);
+
     await this.apiKeysRepo.remove(key);
     logger.info({ userId, keyId }, 'API key revoked');
+  }
+
+  /**
+   * Validate a raw API key sent via X-API-Key header.
+   * Uses SHA256-based Redis lookup for O(1) performance.
+   * Returns the user object if valid, throws UnauthorizedException if not.
+   */
+  async validateApiKey(rawKey: string): Promise<{ sub: string; email: string; role: string; keyId: string }> {
+    if (!rawKey || !rawKey.startsWith('esk_')) {
+      throw new UnauthorizedException('Invalid API key format');
+    }
+
+    const sha256 = crypto.createHash('sha256').update(rawKey).digest('hex');
+    const cached = await this.redis.get(`apikey:lookup:${sha256}`);
+
+    if (!cached) {
+      throw new UnauthorizedException('API key not found or expired');
+    }
+
+    const { userId, keyId } = JSON.parse(cached);
+    const user = await this.usersRepo.findOne({ where: { id: userId, isActive: true } });
+    if (!user) {
+      throw new UnauthorizedException('User account is inactive or deleted');
+    }
+
+    // Update lastUsedAt asynchronously — don't block the request
+    this.apiKeysRepo.update({ id: keyId }, { lastUsedAt: new Date() }).catch(() => {});
+
+    logger.info({ userId, keyId }, 'API key validated');
+    return { sub: user.id, email: user.email, role: user.role, keyId };
   }
 
   private async generateTokenPair(user: UserEntity, ip: string, userAgent: string, existingDeviceId?: string): Promise<TokenPair> {

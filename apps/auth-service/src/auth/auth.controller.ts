@@ -128,6 +128,12 @@ export class AuthController {
     return this.authService.revokeApiKey(req.user.sub, id);
   }
 
+  @Post('validate-key')
+  @ApiOperation({ summary: 'Validate an API key (called by gateway internally)' })
+  async validateApiKey(@Body() body: { key: string }) {
+    return this.authService.validateApiKey(body.key);
+  }
+
   @Get('health')
   @ApiOperation({ summary: 'Service health check' })
   health() {

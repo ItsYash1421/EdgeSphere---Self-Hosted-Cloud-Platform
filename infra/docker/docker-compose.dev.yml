@@ -400,6 +400,7 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+      KAFKA_BROKER: kafka:9092
       CACHE_TTL_SECONDS: "3600"
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-internal-secret-change-in-production}
       NODE_ENV: development
@@ -408,6 +409,8 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      kafka:
+        condition: service_started
     networks:
       - edgesphere-net
 
@@ -425,6 +428,7 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+      KAFKA_BROKER: kafka:9092
       CACHE_TTL_SECONDS: "3600"
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-internal-secret-change-in-production}
       NODE_ENV: development
@@ -433,6 +437,8 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      kafka:
+        condition: service_started
     networks:
       - edgesphere-net
 

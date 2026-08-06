@@ -173,7 +173,7 @@ export default function DashboardOverview() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Total Requests" value={stats.totalRequests.toLocaleString()} positive icon={Activity} accentColor="var(--brand)" iconBg="var(--brand-glow)" />
         <StatCard label="Cache Hit Ratio" value={`${hitRatio}%`} positive icon={Zap} accentColor="var(--green)" iconBg="var(--green-bg)" />
-        <StatCard label="Bandwidth Served" value={formatBytes(stats.bandwidth)} positive icon={Globe} accentColor="var(--brand)" iconBg="var(--brand-glow)" />
+        <StatCard label="Bandwidth Served" value={formatBytes(stats.totalBandwidthBytes)} positive icon={Globe} accentColor="var(--brand)" iconBg="var(--brand-glow)" />
         <StatCard label="Error Rate" value={`${errorRatio}%`} icon={AlertTriangle} accentColor="var(--red)" iconBg="var(--red-bg)" />
       </div>
 

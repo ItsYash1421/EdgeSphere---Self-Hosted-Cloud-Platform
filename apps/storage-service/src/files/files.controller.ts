@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Body, Param, Query, UseGuards, Request, UseInterceptors, UploadedFile, Res, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Param, Query, UseGuards, Request, UseInterceptors, UploadedFile, Res, HttpCode, HttpStatus, Optional } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { FilesService } from './files.service';
 import { JwtAuthGuard } from '../auth/jwt.guard';
@@ -32,7 +32,10 @@ export class FilesController {
     return this.filesService.listFiles(req.user.sub, bucket, prefix, page || 1, pageSize || 50);
   }
 
-  @UseGuards(JwtAuthGuard)
+  // Download is intentionally unauthenticated at the guard level.
+  // The FilesService checks bucket.isPublic — if the bucket is public,
+  // the file is served freely (CDN uses this). If private, the service
+  // will throw ForbiddenException unless a valid user owns it.
   @Get('files/:key')
   async downloadFile(
     @Request() req,
@@ -42,14 +45,18 @@ export class FilesController {
     @Res() res: Response
   ) {
     const parsedVersion = version ? parseInt(version, 10) : undefined;
-    const { stream, contentType, size, etag } = await this.filesService.downloadFile(req.user.sub, bucket, key, parsedVersion);
-    
+    // req.user is set only if a valid JWT was present (via optional auth check in middleware)
+    // Pass null for anonymous access — FilesService allows it for public buckets
+    const userId = req.user?.sub || null;
+    const { stream, contentType, size, etag } = await this.filesService.downloadFile(userId, bucket, key, parsedVersion);
+
     res.set({
       'Content-Type': contentType,
       'Content-Length': size,
       'ETag': etag,
+      'Cache-Control': 'public, max-age=3600',
     });
-    
+
     stream.pipe(res);
   }
 
