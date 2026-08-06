@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query } from '@nestjs/common';
 import { AlertsService } from './alerts.service';
 import { AlertRule } from './alert-rule';
 
@@ -7,8 +7,8 @@ export class AlertsController {
   constructor(private readonly alertsService: AlertsService) {}
 
   @Get('rules')
-  listRules() {
-    return this.alertsService.listRules();
+  listRules(@Query('page') page?: number, @Query('pageSize') pageSize?: number) {
+    return this.alertsService.listRules(page || 1, pageSize || 20);
   }
 
   @Post('rules')
@@ -28,7 +28,7 @@ export class AlertsController {
   }
 
   @Get('history')
-  getAlertHistory() {
-    return this.alertsService.getAlertHistory();
+  getAlertHistory(@Query('page') page?: number, @Query('pageSize') pageSize?: number) {
+    return this.alertsService.getAlertHistory(page || 1, pageSize || 20);
   }
 }

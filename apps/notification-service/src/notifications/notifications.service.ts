@@ -117,7 +117,10 @@ export class NotificationsService {
     });
   }
 
-  getHistory(): NotificationRecord[] {
-    return this.history;
+  getHistory(page = 1, pageSize = 20) {
+    const total = this.history.length;
+    const start = (page - 1) * pageSize;
+    const data = this.history.slice(start, start + pageSize);
+    return { data, total, page, pageSize };
   }
 }

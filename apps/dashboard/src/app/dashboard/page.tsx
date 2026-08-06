@@ -3,17 +3,24 @@
 import { useState, useEffect } from 'react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, BarChart, Bar
+  Tooltip, ResponsiveContainer
 } from 'recharts';
-import { Activity, Zap, Server, Globe, ArrowUpRight, ArrowDownRight, Database, Users, AlertTriangle, Loader2 } from 'lucide-react';
+import { Activity, Zap, Server, Globe, ArrowUpRight, ArrowDownRight, AlertTriangle, Loader2 } from 'lucide-react';
 import api from '@/lib/api';
+import { cn } from '@/lib/utils';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 
 const METHOD_COLORS: Record<string, string> = {
   GET: 'var(--blue)', POST: 'var(--green)', DELETE: 'var(--red)', PUT: 'var(--yellow)'
 };
 
-const STATUS_CLASS: Record<number, string> = {
-  200: 'badge-green', 201: 'badge-green', 204: 'badge-blue', 400: 'badge-yellow', 401: 'badge-red', 403: 'badge-red', 404: 'badge-yellow', 500: 'badge-red', 502: 'badge-red'
+const STATUS_COLOR: Record<number, string> = {
+  200: 'text-emerald-500 bg-emerald-500/10', 201: 'text-emerald-500 bg-emerald-500/10',
+  204: 'text-blue-500 bg-blue-500/10', 400: 'text-amber-500 bg-amber-500/10',
+  401: 'text-red-500 bg-red-500/10', 403: 'text-red-500 bg-red-500/10',
+  404: 'text-amber-500 bg-amber-500/10', 500: 'text-red-500 bg-red-500/10', 502: 'text-red-500 bg-red-500/10',
 };
 
 function StatCard({
@@ -23,19 +30,24 @@ function StatCard({
   icon: any; accentColor: string; iconBg: string;
 }) {
   return (
-    <div className="stat-card" style={{ '--accent-color': accentColor } as React.CSSProperties}>
-      <div className="stat-icon" style={{ '--icon-bg': iconBg, color: accentColor } as React.CSSProperties}>
-        <Icon size={18} />
-      </div>
-      <div className="stat-label">{label}</div>
-      <div className="stat-value">{value}</div>
-      {change && (
-        <div className={`stat-change ${positive ? 'up' : 'down'}`}>
-          {positive ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
-          {change} vs last hour
+    <Card className="gap-3 py-5">
+      <CardContent className="px-5">
+        <div
+          className="mb-3 flex size-9 items-center justify-center rounded-md"
+          style={{ background: iconBg, color: accentColor }}
+        >
+          <Icon className="size-[18px]" />
         </div>
-      )}
-    </div>
+        <div className="text-xs font-medium text-muted-foreground">{label}</div>
+        <div className="mt-1 text-2xl font-bold tracking-tight text-foreground">{value}</div>
+        {change && (
+          <div className={cn('mt-2 flex items-center gap-1 text-xs font-medium', positive ? 'text-emerald-500' : 'text-red-500')}>
+            {positive ? <ArrowUpRight className="size-3" /> : <ArrowDownRight className="size-3" />}
+            {change} vs last hour
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -44,46 +56,40 @@ function EdgeServerCard({ name, region, status, cacheHit, requests, latency }: {
   cacheHit: string; requests: string; latency: string;
 }) {
   return (
-    <div className="card" style={{ flex: 1, minWidth: 280 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-        <div style={{
-          width: 40, height: 40, borderRadius: 'var(--radius-sm)',
-          background: 'var(--brand)', color: 'white',
-          display: 'flex', alignItems: 'center', justifyContent: 'center'
-        }}><Server size={20} /></div>
-        <div>
-          <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-primary)' }}>{name}</div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{region}</div>
-        </div>
-        <span className={`badge badge-${status === 'online' ? 'green' : 'red'}`} style={{ marginLeft: 'auto' }}>
-          <span className={`status-dot ${status}`} style={{ width: 6, height: 6 }} /> {status}
-        </span>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-        {[
-          { label: 'Cache Hit', value: cacheHit },
-          { label: 'Requests', value: requests },
-          { label: 'Latency', value: latency },
-        ].map(m => (
-          <div key={m.label} style={{ textAlign: 'center', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '12px 8px' }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>{m.value}</div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>{m.label}</div>
+    <Card className="min-w-[280px] flex-1 py-5">
+      <CardContent className="px-5">
+        <div className="mb-5 flex items-center gap-3">
+          <div className="flex size-10 items-center justify-center rounded-md bg-brand text-white">
+            <Server className="size-5" />
           </div>
-        ))}
-      </div>
-    </div>
+          <div>
+            <div className="text-sm font-semibold text-foreground">{name}</div>
+            <div className="text-xs text-muted-foreground">{region}</div>
+          </div>
+          <Badge
+            variant="outline"
+            className={cn('ml-auto gap-1.5', status === 'online' ? 'border-emerald-500/30 text-emerald-500' : 'border-red-500/30 text-red-500')}
+          >
+            <span className={cn('size-1.5 rounded-full', status === 'online' ? 'bg-emerald-500' : 'bg-red-500')} />
+            {status}
+          </Badge>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            { label: 'Cache Hit', value: cacheHit },
+            { label: 'Requests', value: requests },
+            { label: 'Latency', value: latency },
+          ].map((m) => (
+            <div key={m.label} className="rounded-md border border-border bg-muted/40 px-2 py-3 text-center">
+              <div className="text-base font-bold text-foreground">{m.value}</div>
+              <div className="mt-1 text-[11px] text-muted-foreground">{m.label}</div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
-
-const CustomTooltipStyle = {
-  background: 'var(--bg-elevated)',
-  border: '1px solid var(--border)',
-  borderRadius: 'var(--radius-sm)',
-  padding: '10px 14px',
-  fontSize: 12,
-  color: 'var(--text-primary)',
-  boxShadow: 'var(--shadow-md)'
-};
 
 function formatBytes(bytes: number, decimals = 2) {
   if (!+bytes) return '0 Bytes';
@@ -125,7 +131,7 @@ export default function DashboardOverview() {
   useEffect(() => {
     setMounted(true);
     fetchData();
-    const interval = setInterval(fetchData, 5000); // Live poll every 5s
+    const interval = setInterval(fetchData, 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -133,19 +139,17 @@ export default function DashboardOverview() {
 
   if (loading && !summary) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '50vh', color: 'var(--brand)' }}>
-        <Loader2 size={32} className="spinner" />
+      <div className="flex h-[50vh] items-center justify-center text-brand">
+        <Loader2 className="size-8 animate-spin" />
       </div>
     );
   }
 
-  // Fallbacks if data is zero/missing from brand new DB
   const stats = summary || { totalRequests: 0, cacheHitRatio: 0, totalBandwidthBytes: 0, errorRate: 0 };
   const hitRatio = (stats.cacheHitRatio * 100).toFixed(1);
   const errorRatio = (stats.errorRate * 100).toFixed(2);
   const liveRPS = rateData.length > 0 ? +(rateData[rateData.length - 1].value / 60).toFixed(1) : 0;
 
-  // Transform rateData for the chart, joining in the real cache-hit-ratio time series by bucket
   const cacheRatioByBucket = new Map(cacheRatioSeries.map((c) => [String(c.t), c.value]));
   const chartData = rateData.length > 0 ? rateData.map(d => ({
     time: new Date(d.t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -154,54 +158,43 @@ export default function DashboardOverview() {
   })) : [];
 
   return (
-    <div>
-      {/* Header */}
-      <div className="page-header">
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div>
-          <h1 className="page-title">Platform Overview</h1>
-          <p className="page-subtitle">Real-time metrics across all EdgeSphere services</p>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Platform Overview</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Real-time metrics across all EdgeSphere services</p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{
-            background: 'var(--green-bg)', border: '1px solid rgba(46,160,67,0.2)',
-            borderRadius: 'var(--radius-sm)', padding: '8px 16px', fontSize: 13,
-            color: 'var(--green)', fontWeight: 600,
-            display: 'flex', alignItems: 'center', gap: 8
-          }}>
-            <Activity size={16} className="pulse" />
-            {liveRPS.toLocaleString()} req/s
-          </div>
+        <div className="flex w-fit items-center gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-500">
+          <Activity className="size-4 animate-pulse" />
+          {liveRPS.toLocaleString()} req/s
         </div>
       </div>
 
-      {/* Stat Grid */}
-      <div className="stat-grid" style={{ marginBottom: 28 }}>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Total Requests" value={stats.totalRequests.toLocaleString()} positive icon={Activity} accentColor="var(--brand)" iconBg="var(--brand-glow)" />
         <StatCard label="Cache Hit Ratio" value={`${hitRatio}%`} positive icon={Zap} accentColor="var(--green)" iconBg="var(--green-bg)" />
         <StatCard label="Bandwidth Served" value={formatBytes(stats.bandwidth)} positive icon={Globe} accentColor="var(--brand)" iconBg="var(--brand-glow)" />
         <StatCard label="Error Rate" value={`${errorRatio}%`} icon={AlertTriangle} accentColor="var(--red)" iconBg="var(--red-bg)" />
       </div>
 
-      {/* Charts row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 20, marginBottom: 28 }}>
-        {/* Request Volume Chart */}
-        <div className="card" style={{ gridColumn: '1 / -1', '@media (min-width: 1024px)': { gridColumn: 'span 2' } } as any}>
-          <div className="card-header">
-            <div>
-              <div className="card-title">Request Volume</div>
-              <div className="card-description">Total requests in real-time</div>
-            </div>
-            <div style={{ display: 'flex', gap: 16, fontSize: 12, color: 'var(--text-muted)' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--brand)', display: 'inline-block' }} />
-                Requests
-              </span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--green)', display: 'inline-block' }} />
-                Cache Hit %
-              </span>
-            </div>
+      <Card className="py-5">
+        <CardHeader className="flex-row items-center justify-between gap-4 px-5">
+          <div>
+            <CardTitle>Request Volume</CardTitle>
+            <CardDescription>Total requests in real-time</CardDescription>
           </div>
+          <div className="flex gap-4 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block size-2.5 rounded-sm bg-brand" />
+              Requests
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block size-2.5 rounded-sm bg-emerald-500" />
+              Cache Hit %
+            </span>
+          </div>
+        </CardHeader>
+        <CardContent className="px-5">
           <ResponsiveContainer width="100%" height={220}>
             {chartData.length > 0 ? (
               <AreaChart data={chartData}>
@@ -219,27 +212,22 @@ export default function DashboardOverview() {
                 <XAxis dataKey="time" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} />
                 <YAxis yAxisId="requests" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} width={40} />
                 <YAxis yAxisId="pct" orientation="right" domain={[0, 100]} tick={{ fontSize: 11, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} width={36} />
-                <Tooltip contentStyle={CustomTooltipStyle} />
+                <Tooltip contentStyle={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 6, padding: '10px 14px', fontSize: 12, color: 'var(--text-primary)' }} />
                 <Area yAxisId="requests" type="monotone" dataKey="requests" stroke="var(--brand)" strokeWidth={2} fill="url(#reqGrad)" name="Requests" />
                 <Area yAxisId="pct" type="monotone" dataKey="cacheHitPct" stroke="var(--green)" strokeWidth={2} fill="url(#cacheGrad)" name="Cache Hit %" />
               </AreaChart>
             ) : (
-              <div style={{ display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+              <div className="flex h-full items-center justify-center text-muted-foreground">
                 Waiting for traffic data...
               </div>
             )}
           </ResponsiveContainer>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
-      {/* Edge Servers */}
-      <div style={{ marginBottom: 28 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-          <h2 style={{ fontSize: 16, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
-            Edge Servers
-          </h2>
-        </div>
-        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+      <div>
+        <h2 className="mb-4 text-base font-semibold text-foreground">Edge Servers</h2>
+        <div className="flex flex-wrap gap-5">
           {edges.length > 0 ? edges.map((edge) => {
             const isOnline = Date.now() - new Date(edge.lastSeen).getTime() < 5 * 60 * 1000;
             return (
@@ -254,66 +242,64 @@ export default function DashboardOverview() {
               />
             );
           }) : (
-            <div className="card" style={{ flex: 1, color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>
-              No edge servers have reported traffic in this window yet.
-            </div>
+            <Card className="flex-1 py-8">
+              <CardContent className="text-center text-muted-foreground">
+                No edge servers have reported traffic in this window yet.
+              </CardContent>
+            </Card>
           )}
         </div>
       </div>
 
-      {/* Recent Requests */}
       <div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-          <h2 style={{ fontSize: 16, fontWeight: 600 }}>Recent Requests</h2>
-        </div>
-        <div className="table-container">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Method</th>
-                <th>Path</th>
-                <th>Status</th>
-                <th>Latency</th>
-                <th>IP</th>
-                <th>Time</th>
-              </tr>
-            </thead>
-            <tbody>
+        <h2 className="mb-4 text-base font-semibold text-foreground">Recent Requests</h2>
+        <Card className="gap-0 py-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Method</TableHead>
+                <TableHead>Path</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Latency</TableHead>
+                <TableHead>IP</TableHead>
+                <TableHead>Time</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {recentEvents.length > 0 ? recentEvents.map((req, i) => (
-                <tr key={i}>
-                  <td>
-                    <span style={{
-                      fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700,
-                      color: METHOD_COLORS[req.method] || 'var(--text-primary)',
-                      background: 'var(--bg-elevated)', padding: '3px 8px', borderRadius: 'var(--radius-sm)'
-                    }}>
+                <TableRow key={i}>
+                  <TableCell>
+                    <span
+                      className="rounded-md bg-muted px-2 py-0.5 font-mono text-[11px] font-bold"
+                      style={{ color: METHOD_COLORS[req.method] || 'var(--text-primary)' }}
+                    >
                       {req.method}
                     </span>
-                  </td>
-                  <td style={{ minWidth: 200 }}>
-                    <code style={{ wordBreak: 'break-all' }}>{req.path}</code>
-                  </td>
-                  <td>
-                    <span className={`badge ${STATUS_CLASS[req.status] || 'badge-secondary'}`}>
+                  </TableCell>
+                  <TableCell className="min-w-[200px] max-w-[320px] truncate font-mono text-xs">{req.path}</TableCell>
+                  <TableCell>
+                    <span className={cn('rounded-md px-2 py-0.5 text-xs font-semibold', STATUS_COLOR[req.status] || 'bg-muted text-muted-foreground')}>
                       {req.status}
                     </span>
-                  </td>
-                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{req.latencyMs}ms</td>
-                  <td><span className="badge badge-secondary">{req.ip}</span></td>
-                  <td style={{ color: 'var(--text-muted)', fontSize: 12, minWidth: 100 }}>
+                  </TableCell>
+                  <TableCell className="font-mono text-xs">{req.latencyMs}ms</TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="font-mono">{req.ip}</Badge>
+                  </TableCell>
+                  <TableCell className="min-w-[100px] text-xs text-muted-foreground">
                     {new Date(req.time).toLocaleTimeString()}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               )) : (
-                <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', padding: '32px' }}>
-                    <div style={{ color: 'var(--text-muted)' }}>No recent API traffic found.</div>
-                  </td>
-                </tr>
+                <TableRow>
+                  <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                    No recent API traffic found.
+                  </TableCell>
+                </TableRow>
               )}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
+        </Card>
       </div>
     </div>
   );

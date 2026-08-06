@@ -36,8 +36,14 @@ export class BucketsService {
     return this.bucketRepo.save(bucket);
   }
 
-  async listBuckets(userId: string): Promise<BucketEntity[]> {
-    return this.bucketRepo.find({ where: { userId } });
+  async listBuckets(userId: string, page = 1, pageSize = 50) {
+    const [data, total] = await this.bucketRepo.findAndCount({
+      where: { userId },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      order: { createdAt: 'DESC' },
+    });
+    return { data, total, page, pageSize };
   }
 
   async getBucket(userId: string, name: string): Promise<BucketEntity> {

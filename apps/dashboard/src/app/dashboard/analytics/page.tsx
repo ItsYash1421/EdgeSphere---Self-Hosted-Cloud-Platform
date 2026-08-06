@@ -6,8 +6,14 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line
 } from 'recharts';
+import { AlertCircle } from 'lucide-react';
 
 import api from '@/lib/api';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 
 const BASE = '/v1/analytics';
 
@@ -22,8 +28,15 @@ const TOOLTIP_STYLE = {
   boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
 };
 
+const TIME_RANGES = [
+  { label: '1h', val: '60' },
+  { label: '6h', val: '360' },
+  { label: '24h', val: '1440' },
+  { label: '7d', val: '10080' },
+];
+
 export default function AnalyticsPage() {
-  const [windowTime, setWindowTime] = useState('60'); // default 1h = 60m
+  const [windowTime, setWindowTime] = useState('60');
 
   const { data: summaryData, error: summaryError } = useSWR(`${BASE}/summary?window=${windowTime}`, fetcher, { refreshInterval: 10000 });
   const { data: rateData } = useSWR(`${BASE}/requests/rate?window=${windowTime}`, fetcher, { refreshInterval: 15000 });
@@ -46,214 +59,206 @@ export default function AnalyticsPage() {
     { name: 'Cache Miss', value: cacheRatio.misses || 0, color: '#ef4444' }
   ];
 
+  const kpis = [
+    { label: 'Total Requests', value: summary.totalRequests.toLocaleString(), color: 'var(--brand)' },
+    { label: 'Cache Hit Rate', value: `${(summary.cacheHitRatio * 100).toFixed(1)}%`, color: 'var(--green)' },
+    { label: 'P95 Latency', value: `${Math.round(summary.p95Latency)}ms`, color: 'var(--blue)' },
+    { label: 'Bandwidth', value: `${(summary.totalBandwidthBytes / (1024 * 1024)).toFixed(2)} MB`, color: 'var(--yellow)' },
+    { label: 'Error Rate', value: `${(summary.errorRate * 100).toFixed(2)}%`, color: 'var(--red)' },
+  ];
+
   return (
     <div>
-      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+      <div className="mb-6 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div>
-          <h1 className="page-title">Analytics</h1>
-          <p className="page-subtitle">Real-time request metrics, cache performance, and traffic insights</p>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Analytics</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Real-time request metrics, cache performance, and traffic insights</p>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {[
-            { label: '1h', val: '60' },
-            { label: '6h', val: '360' },
-            { label: '24h', val: '1440' },
-            { label: '7d', val: '10080' }
-          ].map(range => (
-            <button 
-              key={range.val} 
+        <div className="flex w-fit gap-1 rounded-md border border-border bg-muted/40 p-1">
+          {TIME_RANGES.map((range) => (
+            <Button
+              key={range.val}
+              size="sm"
+              variant={windowTime === range.val ? 'default' : 'ghost'}
+              className="h-7 px-3"
               onClick={() => setWindowTime(range.val)}
-              className={`btn btn-sm ${windowTime === range.val ? 'btn-primary' : 'btn-secondary'}`}
             >
               {range.label}
-            </button>
+            </Button>
           ))}
         </div>
       </div>
 
       {summaryError && (
-        <div style={{ background: 'var(--red)20', color: 'var(--red)', padding: 12, borderRadius: 8, marginBottom: 24, fontSize: 13 }}>
-          Error loading analytics data. Retrying...
+        <div className="mb-6 flex items-center gap-2 rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <AlertCircle className="size-4" /> Error loading analytics data. Retrying...
         </div>
       )}
 
-      {/* KPI Row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 14, marginBottom: 24 }}>
-        {[
-          { label: 'Total Requests', value: summary.totalRequests.toLocaleString(), color: 'var(--brand)' },
-          { label: 'Cache Hit Rate', value: `${(summary.cacheHitRatio * 100).toFixed(1)}%`, color: 'var(--green)' },
-          { label: 'P95 Latency', value: `${Math.round(summary.p95Latency)}ms`, color: 'var(--blue)' },
-          { label: 'Bandwidth', value: `${(summary.totalBandwidthBytes / (1024*1024)).toFixed(2)} MB`, color: 'var(--yellow)' },
-          { label: 'Error Rate', value: `${(summary.errorRate * 100).toFixed(2)}%`, color: 'var(--red)' },
-        ].map(kpi => (
-          <div key={kpi.label} style={{
-            background: 'var(--bg-surface)', border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-lg)', padding: '16px', borderTop: `2px solid ${kpi.color}`
-          }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6 }}>
-              {kpi.label}
-            </div>
-            <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>
-              {!summaryData && !summaryError ? '...' : kpi.value}
-            </div>
-          </div>
+      <div className="mb-6 grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-5">
+        {kpis.map((kpi) => (
+          <Card key={kpi.label} className="gap-1.5 rounded-lg border-t-2 py-4" style={{ borderTopColor: kpi.color }}>
+            <CardContent className="px-4">
+              <div className="mb-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">{kpi.label}</div>
+              <div className="text-2xl font-bold tracking-tight text-foreground">
+                {!summaryData && !summaryError ? '...' : kpi.value}
+              </div>
+            </CardContent>
+          </Card>
         ))}
       </div>
 
-      {/* Charts Row 1 */}
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, marginBottom: 16 }}>
-        <div className="card">
-          <div className="card-header">
-            <div>
-              <div className="card-title">Requests Rate</div>
-              <div className="card-description">Requests over time</div>
-            </div>
-          </div>
-          <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={rateSeries}>
-              <defs>
-                <linearGradient id="reqG" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis dataKey="t" tickFormatter={(t) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} />
-              <YAxis tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} />
-              <Tooltip contentStyle={TOOLTIP_STYLE} labelFormatter={(l) => new Date(l).toLocaleTimeString()} />
-              <Area type="monotone" dataKey="value" stroke="#6366f1" strokeWidth={2} fill="url(#reqG)" name="Requests" />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
+      <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1fr]">
+        <Card className="py-5">
+          <CardHeader className="px-5">
+            <CardTitle className="text-base">Requests Rate</CardTitle>
+            <CardDescription>Requests over time</CardDescription>
+          </CardHeader>
+          <CardContent className="px-5">
+            <ResponsiveContainer width="100%" height={220}>
+              <AreaChart data={rateSeries}>
+                <defs>
+                  <linearGradient id="reqG" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="t" tickFormatter={(t) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} labelFormatter={(l) => new Date(l).toLocaleTimeString()} />
+                <Area type="monotone" dataKey="value" stroke="#6366f1" strokeWidth={2} fill="url(#reqG)" name="Requests" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
 
-        <div className="card">
-          <div className="card-header">
-            <div className="card-title">Cache Hit Ratio</div>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
-            <PieChart width={160} height={160}>
-              <Pie data={PIE_DATA} cx={75} cy={75} innerRadius={50} outerRadius={75} paddingAngle={3} dataKey="value">
-                {PIE_DATA.map((entry, i) => (
-                  <Cell key={i} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip contentStyle={TOOLTIP_STYLE} />
-            </PieChart>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {PIE_DATA.map(d => (
-              <div key={d.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ width: 10, height: 10, borderRadius: 2, background: d.color, display: 'inline-block' }} />
-                  <span style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>{d.name}</span>
+        <Card className="py-5">
+          <CardHeader className="px-5">
+            <CardTitle className="text-base">Cache Hit Ratio</CardTitle>
+          </CardHeader>
+          <CardContent className="px-5">
+            <div className="mb-3 flex justify-center">
+              <PieChart width={160} height={160}>
+                <Pie data={PIE_DATA} cx={75} cy={75} innerRadius={50} outerRadius={75} paddingAngle={3} dataKey="value">
+                  {PIE_DATA.map((entry, i) => (
+                    <Cell key={i} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip contentStyle={TOOLTIP_STYLE} />
+              </PieChart>
+            </div>
+            <div className="flex flex-col gap-2">
+              {PIE_DATA.map((d) => (
+                <div key={d.name} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block size-2.5 rounded-sm" style={{ background: d.color }} />
+                    <span className="text-xs text-muted-foreground">{d.name}</span>
+                  </div>
+                  <span className="text-sm font-bold text-foreground">{d.value.toLocaleString()}</span>
                 </div>
-                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>{d.value.toLocaleString()}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Charts Row 2 */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
-        <div className="card">
-          <div className="card-header">
-            <div className="card-title">Response Latency</div>
-            <div className="card-description">P50 / P95 / P99 over time</div>
-          </div>
-          <ResponsiveContainer width="100%" height={180}>
-            <LineChart data={latencySeries}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis dataKey="t" tickFormatter={(t) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} />
-              <YAxis tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} />
-              <Tooltip contentStyle={TOOLTIP_STYLE} />
-              <Line type="monotone" dataKey="p50" stroke="#22c55e" strokeWidth={2} dot={false} name="P50" />
-              <Line type="monotone" dataKey="p95" stroke="#eab308" strokeWidth={2} dot={false} name="P95" />
-              <Line type="monotone" dataKey="p99" stroke="#ef4444" strokeWidth={2} dot={false} name="P99" />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+      <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card className="py-5">
+          <CardHeader className="px-5">
+            <CardTitle className="text-base">Response Latency</CardTitle>
+            <CardDescription>P50 / P95 / P99 over time</CardDescription>
+          </CardHeader>
+          <CardContent className="px-5">
+            <ResponsiveContainer width="100%" height={180}>
+              <LineChart data={latencySeries}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="t" tickFormatter={(t) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: 'var(--text-muted)' }} tickLine={false} axisLine={false} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} />
+                <Line type="monotone" dataKey="p50" stroke="#22c55e" strokeWidth={2} dot={false} name="P50" />
+                <Line type="monotone" dataKey="p95" stroke="#eab308" strokeWidth={2} dot={false} name="P95" />
+                <Line type="monotone" dataKey="p99" stroke="#ef4444" strokeWidth={2} dot={false} name="P99" />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
 
-        <div className="card">
-          <div className="card-header">
-            <div className="card-title">Geographic Distribution</div>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <Card className="py-5">
+          <CardHeader className="px-5">
+            <CardTitle className="text-base">Geographic Distribution</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3 px-5">
             {geoStats.map((geo: any) => (
               <div key={geo.country}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <span style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>{geo.country || 'Unknown'}</span>
-                  <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-primary)' }}>
-                    {geo.requests.toLocaleString()} ({geo.pct}%)
-                  </span>
+                <div className="mb-1 flex justify-between">
+                  <span className="text-xs text-muted-foreground">{geo.country || 'Unknown'}</span>
+                  <span className="text-xs font-semibold text-foreground">{geo.requests.toLocaleString()} ({geo.pct}%)</span>
                 </div>
-                <div className="progress-bar">
-                  <div className="progress-fill" style={{ width: `${geo.pct}%`, background: 'var(--brand)' }} />
+                <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                  <div className="h-full rounded-full bg-brand" style={{ width: `${geo.pct}%` }} />
                 </div>
               </div>
             ))}
             {geoStats.length === 0 && (
-              <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 13, padding: 20 }}>
-                No geographic data available
-              </div>
+              <div className="py-5 text-center text-sm text-muted-foreground">No geographic data available</div>
             )}
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Row 4: Top Paths & Errors */}
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16 }}>
-        <div className="card">
-          <div className="card-header">
-            <h3 className="card-title">Top Paths</h3>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1fr]">
+        <Card className="gap-0 py-0">
+          <div className="border-b border-border px-5 py-4">
+            <h3 className="text-base font-semibold">Top Paths</h3>
           </div>
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Path</th>
-                <th>Requests</th>
-                <th>Avg Latency</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Path</TableHead>
+                <TableHead>Requests</TableHead>
+                <TableHead>Avg Latency</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {topPaths.map((p: any, i: number) => (
-                <tr key={i}>
-                  <td><code style={{ fontSize: 12 }}>{p.path}</code></td>
-                  <td>{p.count.toLocaleString()}</td>
-                  <td>{Math.round(p.avgLatency)}ms</td>
-                </tr>
+                <TableRow key={i}>
+                  <TableCell><code className="text-xs">{p.path}</code></TableCell>
+                  <TableCell>{p.count.toLocaleString()}</TableCell>
+                  <TableCell>{Math.round(p.avgLatency)}ms</TableCell>
+                </TableRow>
               ))}
               {topPaths.length === 0 && (
-                <tr><td colSpan={3} style={{ textAlign: 'center', padding: 20 }}>No path data</td></tr>
+                <TableRow><TableCell colSpan={3} className="py-6 text-center text-muted-foreground">No path data</TableCell></TableRow>
               )}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
+        </Card>
 
-        <div className="card">
-          <div className="card-header">
-            <h3 className="card-title">Errors</h3>
+        <Card className="gap-0 py-0">
+          <div className="border-b border-border px-5 py-4">
+            <h3 className="text-base font-semibold">Errors</h3>
           </div>
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Status</th>
-                <th>Count</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Status</TableHead>
+                <TableHead>Count</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {errors.map((e: any, i: number) => (
-                <tr key={i}>
-                  <td><span className="badge" style={{ background: 'var(--red)20', color: 'var(--red)' }}>{e.status}</span></td>
-                  <td>{e.count.toLocaleString()}</td>
-                </tr>
+                <TableRow key={i}>
+                  <TableCell><Badge variant="destructive">{e.status}</Badge></TableCell>
+                  <TableCell>{e.count.toLocaleString()}</TableCell>
+                </TableRow>
               ))}
               {errors.length === 0 && (
-                <tr><td colSpan={2} style={{ textAlign: 'center', padding: 20 }}>No errors</td></tr>
+                <TableRow><TableCell colSpan={2} className={cn('py-6 text-center text-muted-foreground')}>No errors</TableCell></TableRow>
               )}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
+        </Card>
       </div>
     </div>
   );

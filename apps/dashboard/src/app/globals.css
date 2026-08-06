@@ -1,4 +1,10 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* next-themes toggles a `.dark` class on <html> — make Tailwind's `dark:` variant
+   respond to that instead of the OS `prefers-color-scheme`. */
+@custom-variant dark (&:is(.dark *));
 
 /* ─── CSS Variables ────────────────────────────────────────────── */
 :root {
@@ -54,6 +60,36 @@
   --radius-md: 6px;
   --radius-lg: 8px;
   --radius-xl: 12px;
+
+  /* ─── shadcn/ui semantic tokens (aliased onto the AWS palette above) ────── */
+  --radius: 0.5rem;
+  --background: var(--bg-base);
+  --foreground: var(--text-primary);
+  --card: var(--bg-surface);
+  --card-foreground: var(--text-primary);
+  --popover: var(--bg-surface);
+  --popover-foreground: var(--text-primary);
+  --primary: var(--brand);
+  --primary-foreground: #ffffff;
+  --secondary: var(--bg-elevated);
+  --secondary-foreground: var(--text-primary);
+  --muted: var(--bg-elevated);
+  --muted-foreground: var(--text-secondary);
+  --accent: var(--bg-overlay);
+  --accent-foreground: var(--text-primary);
+  --destructive: var(--red);
+  --destructive-foreground: #ffffff;
+  --input: var(--border);
+  --ring: var(--brand);
+
+  --sidebar: var(--bg-surface);
+  --sidebar-foreground: var(--text-primary);
+  --sidebar-primary: var(--brand);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: var(--bg-elevated);
+  --sidebar-accent-foreground: var(--text-primary);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--brand);
 }
 
 :root.dark {
@@ -90,14 +126,96 @@
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
   --shadow-brand: 0 0 24px rgba(255, 153, 0, 0.2);
+
+  /* shadcn/ui semantic tokens — most re-derive automatically via var() chaining
+     from the AWS dark palette above; only the ones needing a different value
+     in dark mode (e.g. text-on-orange contrast) are restated here. */
+  --primary-foreground: #1a1200;
+  --destructive-foreground: #1a0400;
+}
+
+/* ─── Tailwind v4 theme bridge ─────────────────────────────────────
+   Tailwind only generates utilities (bg-primary, rounded-lg, font-sans, ...)
+   from variables declared inside @theme. Everything here just points at the
+   plain CSS variables above, so both the old hand-written classes and the
+   new Tailwind/shadcn components read from one shared source of truth. */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-success: var(--green);
+  --color-warning: var(--yellow);
+  --color-info: var(--blue);
+  --color-brand: var(--brand);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+}
+
+@keyframes accordion-down {
+  from { height: 0; }
+  to { height: var(--radix-accordion-content-height); }
+}
+@keyframes accordion-up {
+  from { height: var(--radix-accordion-content-height); }
+  to { height: 0; }
 }
 
 /* ─── Reset ────────────────────────────────────────────────────── */
-*, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+/* Must be in @layer base — Tailwind wraps all its utilities in named
+   layers, and an unlayered rule (this one, without @layer) would beat
+   every layered utility regardless of specificity, silently zeroing out
+   p-*/px-*/gap-* etc. on every new Tailwind-based component. */
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
 }
+
+/* Wrapped in @layer base — this legacy hand-rolled CSS (pre-dating the
+   Tailwind migration) happens to reuse Tailwind-identical class names
+   (.flex, .gap-4, .w-full, .text-center, .truncate, ...) for its own
+   mini utility set further down. Left unlayered, those plain rules would
+   beat every Tailwind utility of the same name (unlayered CSS always
+   outranks layered CSS, regardless of specificity or source order),
+   silently breaking spacing/sizing on every new Tailwind-based page. */
+@layer base {
 
 html {
   color-scheme: dark;
@@ -812,3 +930,5 @@ code {
 .text-center { text-align: center; }
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .font-mono { font-family: var(--font-mono); }
+
+} /* end @layer base */

@@ -12,6 +12,7 @@ import {
   Request,
   Req,
   Headers,
+  Query,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -107,8 +108,12 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'List all API keys' })
-  async listApiKeys(@Request() req: { user: { sub: string } }) {
-    return this.authService.listApiKeys(req.user.sub);
+  async listApiKeys(
+    @Request() req: { user: { sub: string } },
+    @Query('page') page?: number,
+    @Query('pageSize') pageSize?: number,
+  ) {
+    return this.authService.listApiKeys(req.user.sub, page || 1, pageSize || 20);
   }
 
   @Delete('api-keys/:id')

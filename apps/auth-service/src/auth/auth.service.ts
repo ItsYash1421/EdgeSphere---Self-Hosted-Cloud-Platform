@@ -163,9 +163,15 @@ export class AuthService {
     };
   }
 
-  async listApiKeys(userId: string) {
-    const keys = await this.apiKeysRepo.find({ where: { userId }, order: { createdAt: 'DESC' } });
-    return keys.map(({ keyHash, ...key }) => key);
+  async listApiKeys(userId: string, page = 1, pageSize = 20) {
+    const [keys, total] = await this.apiKeysRepo.findAndCount({
+      where: { userId },
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    });
+    const data = keys.map(({ keyHash, ...key }) => key);
+    return { data, total, page, pageSize };
   }
 
   async revokeApiKey(userId: string, keyId: string): Promise<void> {

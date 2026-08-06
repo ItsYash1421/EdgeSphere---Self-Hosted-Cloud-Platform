@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 
 @Controller('notifications')
@@ -6,8 +6,8 @@ export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
 
   @Get('history')
-  getHistory() {
-    return this.notificationsService.getHistory();
+  getHistory(@Query('page') page?: number, @Query('pageSize') pageSize?: number) {
+    return this.notificationsService.getHistory(page || 1, pageSize || 20);
   }
 
   @Post('test')

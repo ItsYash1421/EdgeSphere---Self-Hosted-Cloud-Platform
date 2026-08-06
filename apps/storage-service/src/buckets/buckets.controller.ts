@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Body, Param, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Param, Query, UseGuards, Request, HttpCode, HttpStatus } from '@nestjs/common';
 import { BucketsService } from './buckets.service';
 import { CreateBucketDto } from './dto/bucket.dto';
 import { JwtAuthGuard } from '../auth/jwt.guard';
@@ -14,8 +14,12 @@ export class BucketsController {
   }
 
   @Get()
-  listBuckets(@Request() req) {
-    return this.bucketsService.listBuckets(req.user.sub);
+  listBuckets(
+    @Request() req,
+    @Query('page') page?: number,
+    @Query('pageSize') pageSize?: number
+  ) {
+    return this.bucketsService.listBuckets(req.user.sub, page || 1, pageSize || 50);
   }
 
   @Get(':name')
@@ -24,6 +28,7 @@ export class BucketsController {
   }
 
   @Delete(':name')
+  @HttpCode(HttpStatus.NO_CONTENT)
   deleteBucket(@Request() req, @Param('name') name: string) {
     return this.bucketsService.deleteBucket(req.user.sub, name);
   }

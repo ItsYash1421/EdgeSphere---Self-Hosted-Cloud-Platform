@@ -123,8 +123,11 @@ export class AlertsService implements OnModuleInit, OnModuleDestroy {
     return { triggered, value, message };
   }
 
-  getAlertHistory(): AlertRecord[] {
-    return this.history;
+  getAlertHistory(page = 1, pageSize = 20) {
+    const total = this.history.length;
+    const start = (page - 1) * pageSize;
+    const data = this.history.slice(start, start + pageSize);
+    return { data, total, page, pageSize };
   }
 
   createRule(rule: Partial<AlertRule>): AlertRule {
@@ -152,7 +155,10 @@ export class AlertsService implements OnModuleInit, OnModuleDestroy {
     this.rules = this.rules.filter((r) => r.id !== id);
   }
 
-  listRules(): AlertRule[] {
-    return this.rules;
+  listRules(page = 1, pageSize = 20) {
+    const total = this.rules.length;
+    const start = (page - 1) * pageSize;
+    const data = this.rules.slice(start, start + pageSize);
+    return { data, total, page, pageSize };
   }
 }

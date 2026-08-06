@@ -1,36 +1,23 @@
 'use client';
 import { useRealtimeMetrics } from '../hooks/useRealtimeMetrics';
+import { cn } from '@/lib/utils';
 
 export function RealtimeIndicator() {
   const { metrics, connected } = useRealtimeMetrics();
-  
+
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-      <span className={`status-dot ${connected ? 'online pulse' : 'offline'}`} 
-            style={{
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              backgroundColor: connected ? '#10b981' : '#9ca3af',
-              display: 'inline-block',
-              boxShadow: connected ? '0 0 0 0 rgba(16, 185, 129, 0.7)' : 'none',
-              animation: connected ? 'pulse 2s infinite' : 'none'
-            }}
-      />
+    <div className="flex items-center gap-1.5 text-xs text-muted-foreground whitespace-nowrap">
+      <span className="relative flex size-2">
+        {connected && (
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
+        )}
+        <span className={cn('relative inline-flex size-2 rounded-full', connected ? 'bg-emerald-500' : 'bg-muted-foreground')} />
+      </span>
       {connected ? (
-        <span style={{ color: '#6b7280' }}>
-          Live · {metrics?.requestsPerSec?.toFixed(1) || '0'} req/s
-        </span>
+        <span>Live &middot; {metrics?.requestsPerSec?.toFixed(1) || '0'} req/s</span>
       ) : (
-        <span style={{ color: '#6b7280' }}>Connecting...</span>
+        <span>Connecting&hellip;</span>
       )}
-      <style>{`
-        @keyframes pulse {
-          0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
-          70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
-          100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
-        }
-      `}</style>
     </div>
   );
 }

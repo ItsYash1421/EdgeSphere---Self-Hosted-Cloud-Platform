@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Body, Param, Query, UseGuards, Request, UseInterceptors, UploadedFile, Res } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Param, Query, UseGuards, Request, UseInterceptors, UploadedFile, Res, HttpCode, HttpStatus } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { FilesService } from './files.service';
 import { JwtAuthGuard } from '../auth/jwt.guard';
@@ -55,6 +55,7 @@ export class FilesController {
 
   @UseGuards(JwtAuthGuard)
   @Delete('files/:key')
+  @HttpCode(HttpStatus.NO_CONTENT)
   deleteFile(
     @Request() req,
     @Param('bucket') bucket: string,

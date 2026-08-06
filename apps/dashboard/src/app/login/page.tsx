@@ -6,6 +6,19 @@ import { useDispatch } from 'react-redux';
 import { setCredentials } from '../../store/slices/authSlice';
 import api from '@/lib/api';
 import { Zap, Globe, Database, Shield, Activity, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
+
+const FEATURES = [
+  { icon: Globe, title: 'Global CDN', desc: 'Edge servers with high-performance caching' },
+  { icon: Database, title: 'Object Storage', desc: 'S3-compatible with fine-grained access' },
+  { icon: Shield, title: 'API Gateway', desc: 'Secure JWT auth, rate limiting & routing' },
+  { icon: Activity, title: 'Real-time Analytics', desc: 'Deep observability and metrics' },
+];
+
+const STACK = ['NestJS', 'Go', 'Redis', 'MinIO', 'Kafka', 'Prometheus'];
 
 export default function LoginPage() {
   const router = useRouter();
@@ -24,16 +37,15 @@ export default function LoginPage() {
     try {
       const endpoint = mode === 'login' ? '/v1/auth/login' : '/v1/auth/register';
       const data = await api.post<{ accessToken: string; refreshToken: string }>(endpoint, { email, password });
-      
-      // Decode user info from JWT
+
       const payload = JSON.parse(atob(data.accessToken.split('.')[1]));
-      
+
       dispatch(setCredentials({
         user: { email: payload.email, role: payload.role },
         accessToken: data.accessToken,
         refreshToken: data.refreshToken
       }));
-      
+
       router.replace('/dashboard');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Authentication failed';
@@ -44,62 +56,53 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="login-page">
-      <div className="login-bg">
-        <div className="login-glow-1" />
-        <div className="login-glow-2" />
-        <div className="login-grid" />
+    <div className="relative flex min-h-screen overflow-hidden bg-background">
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -top-52 -left-24 size-[600px] rounded-full bg-[radial-gradient(circle,var(--brand-glow)_0%,transparent_70%)]" />
+        <div className="absolute -right-24 -bottom-36 size-[500px] rounded-full bg-[radial-gradient(circle,rgba(0,161,201,0.08)_0%,transparent_70%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(var(--border)_1px,transparent_1px),linear-gradient(90deg,var(--border)_1px,transparent_1px)] bg-[size:40px_40px] opacity-30" />
       </div>
 
-      <div className="login-container">
-        {/* Left: Branding */}
-        <div className="login-brand">
-          <div className="login-brand-logo">
-            <Zap size={28} color="white" />
+      <div className="relative z-10 flex min-h-screen w-full">
+        <div className="hidden flex-1 flex-col justify-center border-r border-border bg-[linear-gradient(135deg,var(--bg-elevated)_0%,transparent_60%)] p-16 lg:flex">
+          <div className="flex size-12 items-center justify-center rounded-md bg-gradient-to-br from-brand to-brand-dark shadow-[var(--shadow-brand)]">
+            <Zap className="size-7 fill-white text-white" />
           </div>
-          <h1 className="login-brand-name">EdgeSphere</h1>
-          <p className="login-brand-tagline">Enterprise-grade cloud infrastructure.</p>
+          <h1 className="mt-6 text-3xl font-extrabold tracking-tight text-foreground">EdgeSphere</h1>
+          <p className="mt-2 mb-10 text-[15px] text-muted-foreground">Enterprise-grade cloud infrastructure.</p>
 
-          <div className="login-features">
-            {[
-              { icon: Globe, title: 'Global CDN', desc: 'Edge servers with high-performance caching' },
-              { icon: Database, title: 'Object Storage', desc: 'S3-compatible with fine-grained access' },
-              { icon: Shield, title: 'API Gateway', desc: 'Secure JWT auth, rate limiting & routing' },
-              { icon: Activity, title: 'Real-time Analytics', desc: 'Deep observability and metrics' },
-            ].map((f) => {
-              const Icon = f.icon;
-              return (
-                <div key={f.title} className="login-feature-item">
-                  <span className="login-feature-icon">
-                    <Icon size={18} />
-                  </span>
-                  <div>
-                    <div className="login-feature-title">{f.title}</div>
-                    <div className="login-feature-desc">{f.desc}</div>
-                  </div>
+          <div className="mb-10 flex flex-col gap-5">
+            {FEATURES.map((f) => (
+              <div key={f.title} className="flex items-start gap-4">
+                <f.icon className="mt-0.5 size-[18px] shrink-0 text-brand" />
+                <div>
+                  <div className="text-sm font-semibold text-foreground">{f.title}</div>
+                  <div className="text-[13px] text-muted-foreground">{f.desc}</div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
 
-          <div className="login-stack-badges">
-            {['NestJS', 'Go', 'Redis', 'MinIO', 'Kafka', 'Prometheus'].map((t) => (
-              <span key={t} className="stack-badge">{t}</span>
+          <div className="flex flex-wrap gap-2">
+            {STACK.map((t) => (
+              <span
+                key={t}
+                className="rounded-md border border-border bg-[var(--bg-overlay)] px-2.5 py-1 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase"
+              >
+                {t}
+              </span>
             ))}
           </div>
         </div>
 
-        {/* Right: Form */}
-        <div className="login-form-container">
-          <div className="login-card">
-            <div className="login-card-header">
-              <div className="login-card-icon">
-                <Zap size={28} className="text-brand" />
-              </div>
-              <h2 className="login-card-title">
+        <div className="flex w-full flex-shrink-0 items-center justify-center bg-card p-6 sm:p-10 lg:w-[500px]">
+          <div className="w-full max-w-[400px]">
+            <div className="mb-8">
+              <Zap className="mb-4 size-7 text-brand" />
+              <h2 className="mb-2 text-2xl font-bold tracking-tight text-foreground">
                 {mode === 'login' ? 'Sign in to EdgeSphere' : 'Create an account'}
               </h2>
-              <p className="login-card-subtitle">
+              <p className="text-sm text-muted-foreground">
                 {mode === 'login'
                   ? 'Access your unified cloud management console.'
                   : 'Start building globally distributed applications.'}
@@ -107,19 +110,18 @@ export default function LoginPage() {
             </div>
 
             {error && (
-              <div className="login-error">
-                <AlertCircle size={16} />
+              <div className="mb-6 flex items-center gap-2.5 rounded-md border border-destructive/20 bg-destructive/10 px-4 py-3 text-[13px] font-medium text-destructive">
+                <AlertCircle className="size-4 shrink-0" />
                 <span>{error}</span>
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="login-form">
-              <div className="input-group">
-                <label className="input-label" htmlFor="email">Email address</label>
-                <input
+            <form onSubmit={handleSubmit} className="mb-6 flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="email">Email address</Label>
+                <Input
                   id="email"
                   type="email"
-                  className="input"
                   placeholder="you@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -128,12 +130,11 @@ export default function LoginPage() {
                 />
               </div>
 
-              <div className="input-group">
-                <label className="input-label" htmlFor="password">Password</label>
-                <input
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="password">Password</Label>
+                <Input
                   id="password"
                   type="password"
-                  className="input"
                   placeholder={mode === 'register' ? 'At least 8 characters' : '••••••••'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -142,282 +143,45 @@ export default function LoginPage() {
                 />
               </div>
 
-              <button
-                id="submit-btn"
-                type="submit"
-                className={`btn btn-primary w-full login-submit ${loading ? 'loading' : ''}`}
-                disabled={loading}
-              >
+              <Button type="submit" size="lg" disabled={loading} className={cn('mt-2 h-11 justify-center')}>
                 {loading ? (
                   <>
-                    <Loader2 size={16} className="spinner" />
+                    <Loader2 className="size-4 animate-spin" />
                     {mode === 'login' ? 'Authenticating...' : 'Creating account...'}
                   </>
                 ) : (
                   <>
                     {mode === 'login' ? 'Sign In' : 'Create Account'}
-                    <ArrowRight size={16} />
+                    <ArrowRight className="size-4" />
                   </>
                 )}
-              </button>
+              </Button>
             </form>
 
-            <div className="login-divider">
-              <span>OR</span>
+            <div className="relative my-6 text-center text-[11px] font-semibold tracking-wider text-muted-foreground">
+              <div className="absolute inset-x-0 top-1/2 h-px bg-border" />
+              <span className="relative bg-card px-3">OR</span>
             </div>
 
-            <button
-              className="btn btn-secondary w-full"
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              className="h-11 w-full"
               onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); }}
             >
-              {mode === 'login' ? "Create a new account" : 'Sign in to an existing account'}
-            </button>
+              {mode === 'login' ? 'Create a new account' : 'Sign in to an existing account'}
+            </Button>
 
             {mode === 'login' && (
-              <p className="login-demo-hint">
-                Demo access: <code>admin@edgesphere.local</code> / <code>admin123</code>
+              <p className="mt-6 text-center text-xs text-muted-foreground">
+                Demo access: <code className="rounded bg-muted px-1 py-0.5 font-mono">admin@edgesphere.local</code> /{' '}
+                <code className="rounded bg-muted px-1 py-0.5 font-mono">admin123</code>
               </p>
             )}
           </div>
         </div>
       </div>
-
-      <style jsx>{`
-        .login-page {
-          min-height: 100vh;
-          background: var(--bg-base);
-          display: flex;
-          position: relative;
-          overflow: hidden;
-        }
-
-        .login-bg {
-          position: absolute;
-          inset: 0;
-          pointer-events: none;
-        }
-
-        .login-glow-1 {
-          position: absolute;
-          top: -200px;
-          left: -100px;
-          width: 600px;
-          height: 600px;
-          background: radial-gradient(circle, var(--brand-glow) 0%, transparent 70%);
-        }
-
-        .login-glow-2 {
-          position: absolute;
-          bottom: -150px;
-          right: -100px;
-          width: 500px;
-          height: 500px;
-          background: radial-gradient(circle, rgba(0,161,201,0.08) 0%, transparent 70%);
-        }
-
-        .login-grid {
-          position: absolute;
-          inset: 0;
-          background-image:
-            linear-gradient(var(--border) 1px, transparent 1px),
-            linear-gradient(90deg, var(--border) 1px, transparent 1px);
-          background-size: 40px 40px;
-          opacity: 0.3;
-        }
-
-        .login-container {
-          display: flex;
-          width: 100%;
-          min-height: 100vh;
-          position: relative;
-          z-index: 1;
-        }
-
-        .login-brand {
-          flex: 1;
-          padding: 60px;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          border-right: 1px solid var(--border);
-          background: linear-gradient(135deg, var(--bg-elevated) 0%, transparent 60%);
-        }
-
-        .login-brand-logo {
-          width: 48px;
-          height: 48px;
-          background: linear-gradient(135deg, var(--brand), var(--brand-dark));
-          border-radius: var(--radius-sm);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          box-shadow: var(--shadow-brand);
-          margin-bottom: 24px;
-        }
-
-        .login-brand-name {
-          font-size: 32px;
-          font-weight: 800;
-          letter-spacing: -1px;
-          color: var(--text-primary);
-          margin-bottom: 8px;
-        }
-
-        .login-brand-tagline {
-          font-size: 15px;
-          color: var(--text-secondary);
-          margin-bottom: 40px;
-        }
-
-        .login-features {
-          display: flex;
-          flex-direction: column;
-          gap: 20px;
-          margin-bottom: 40px;
-        }
-
-        .login-feature-item {
-          display: flex;
-          align-items: flex-start;
-          gap: 16px;
-        }
-
-        .login-feature-icon {
-          color: var(--brand);
-          margin-top: 2px;
-          flex-shrink: 0;
-        }
-
-        .login-feature-title {
-          font-size: 14px;
-          font-weight: 600;
-          color: var(--text-primary);
-        }
-
-        .login-feature-desc {
-          font-size: 13px;
-          color: var(--text-muted);
-        }
-
-        .login-stack-badges {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 8px;
-        }
-
-        .stack-badge {
-          font-size: 11px;
-          font-weight: 600;
-          padding: 4px 10px;
-          border-radius: var(--radius-md);
-          background: var(--bg-overlay);
-          color: var(--text-secondary);
-          border: 1px solid var(--border);
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-        }
-
-        .login-form-container {
-          width: 500px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 40px;
-          flex-shrink: 0;
-          background: var(--bg-surface);
-        }
-
-        .login-card {
-          width: 100%;
-          max-width: 400px;
-        }
-
-        .login-card-header {
-          margin-bottom: 32px;
-        }
-
-        .login-card-icon {
-          margin-bottom: 16px;
-          color: var(--brand);
-        }
-
-        .login-card-title {
-          font-size: 24px;
-          font-weight: 700;
-          letter-spacing: -0.5px;
-          color: var(--text-primary);
-          margin-bottom: 8px;
-        }
-
-        .login-card-subtitle {
-          font-size: 14px;
-          color: var(--text-secondary);
-        }
-
-        .login-error {
-          background: var(--red-bg);
-          border: 1px solid rgba(209, 50, 18, 0.2);
-          border-radius: var(--radius-sm);
-          padding: 12px 16px;
-          font-size: 13px;
-          color: var(--red);
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          margin-bottom: 24px;
-          font-weight: 500;
-        }
-
-        .login-form { margin-bottom: 24px; }
-
-        .login-submit {
-          height: 44px;
-          font-size: 14px;
-          justify-content: center;
-        }
-
-        .spinner {
-          animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        .login-divider {
-          text-align: center;
-          position: relative;
-          margin: 24px 0;
-          color: var(--text-muted);
-          font-size: 11px;
-          font-weight: 600;
-          letter-spacing: 1px;
-        }
-
-        .login-divider::before {
-          content: '';
-          position: absolute;
-          left: 0; right: 0; top: 50%;
-          height: 1px;
-          background: var(--border);
-        }
-
-        .login-divider span {
-          position: relative;
-          background: var(--bg-surface);
-          padding: 0 12px;
-        }
-
-        .login-demo-hint {
-          text-align: center;
-          font-size: 12px;
-          color: var(--text-muted);
-          margin-top: 24px;
-        }
-
-        @media (max-width: 900px) {
-          .login-brand { display: none; }
-          .login-form-container { width: 100%; padding: 24px; }
-        }
-      `}</style>
     </div>
   );
 }
