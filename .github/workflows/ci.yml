@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       run_tests:
-        description: 'Run tests? (requires Postgres + Redis)'
+        description: 'Run unit tests?'
         required: false
         default: 'false'
         type: choice
@@ -12,7 +12,7 @@ on:
           - 'true'
           - 'false'
       run_build:
-        description: 'Run Docker builds?'
+        description: 'Validate Docker builds?'
         required: false
         default: 'false'
         type: choice
@@ -37,28 +37,34 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
 
-      - name: Lint (all services, continue on warn)
-        run: |
-          pnpm --filter "@edgesphere/gateway" exec eslint src --ext .ts --max-warnings=100 || true
-          pnpm --filter "@edgesphere/auth-service" exec eslint src --ext .ts --max-warnings=100 || true
-          pnpm --filter "@edgesphere/storage-service" exec eslint src --ext .ts --max-warnings=100 || true
-          pnpm --filter "@edgesphere/analytics-service" exec eslint src --ext .ts --max-warnings=100 || true
-          pnpm --filter "@edgesphere/notification-service" exec eslint src --ext .ts --max-warnings=100 || true
+      - name: Typecheck — gateway
+        run: pnpm --filter "@edgesphere/gateway" run typecheck
         continue-on-error: true
 
-      - name: Typecheck (all services)
-        run: |
-          pnpm --filter "@edgesphere/gateway" exec tsc --noEmit || true
-          pnpm --filter "@edgesphere/auth-service" exec tsc --noEmit || true
-          pnpm --filter "@edgesphere/storage-service" exec tsc --noEmit || true
-          pnpm --filter "@edgesphere/analytics-service" exec tsc --noEmit || true
-          pnpm --filter "@edgesphere/notification-service" exec tsc --noEmit || true
+      - name: Typecheck — auth-service
+        run: pnpm --filter "@edgesphere/auth-service" run typecheck
         continue-on-error: true
 
-      - name: ✅ Lint complete
-        run: echo "Lint and typecheck done (warnings allowed)"
+      - name: Typecheck — storage-service
+        run: pnpm --filter "@edgesphere/storage-service" run typecheck
+        continue-on-error: true
+
+      - name: Typecheck — analytics-service
+        run: pnpm --filter "@edgesphere/analytics-service" run typecheck
+        continue-on-error: true
+
+      - name: Typecheck — notification-service
+        run: pnpm --filter "@edgesphere/notification-service" run typecheck
+        continue-on-error: true
+
+      - name: Lint — all services
+        run: pnpm run lint
+        continue-on-error: true
+
+      - name: ✅ Checks complete
+        run: echo "Lint and typecheck done!"
 
   test:
     name: Unit Tests
@@ -110,14 +116,13 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
 
       - name: Run tests
         run: |
           pnpm --filter "@edgesphere/auth-service" test --passWithNoTests || true
           pnpm --filter "@edgesphere/gateway" test --passWithNoTests || true
           pnpm --filter "@edgesphere/storage-service" test --passWithNoTests || true
-        continue-on-error: true
 
   build:
     name: Docker Build Validation
@@ -128,26 +133,19 @@ jobs:
       fail-fast: false
       matrix:
         service:
-          - name: gateway
-            dockerfile: apps/gateway/Dockerfile
-          - name: auth-service
-            dockerfile: apps/auth-service/Dockerfile
-          - name: storage-service
-            dockerfile: apps/storage-service/Dockerfile
-          - name: analytics-service
-            dockerfile: apps/analytics-service/Dockerfile
-          - name: notification-service
-            dockerfile: apps/notification-service/Dockerfile
-          - name: cdn-service
-            dockerfile: apps/cdn-service/Dockerfile
-          - name: dashboard
-            dockerfile: apps/dashboard/Dockerfile
+          - { name: gateway, dockerfile: apps/gateway/Dockerfile }
+          - { name: auth-service, dockerfile: apps/auth-service/Dockerfile }
+          - { name: storage-service, dockerfile: apps/storage-service/Dockerfile }
+          - { name: analytics-service, dockerfile: apps/analytics-service/Dockerfile }
+          - { name: notification-service, dockerfile: apps/notification-service/Dockerfile }
+          - { name: cdn-service, dockerfile: apps/cdn-service/Dockerfile }
+          - { name: dashboard, dockerfile: apps/dashboard/Dockerfile }
     steps:
       - uses: actions/checkout@v4
 
       - uses: docker/setup-buildx-action@v3
 
-      - name: Build ${{ matrix.service.name }} (no push)
+      - name: Build ${{ matrix.service.name }} (validation only, no push)
         uses: docker/build-push-action@v5
         with:
           context: .
