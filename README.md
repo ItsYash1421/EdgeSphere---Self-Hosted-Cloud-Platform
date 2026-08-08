@@ -2,7 +2,6 @@
 
 > A self-hosted cloud platform combining Cloudflare + AWS S3 + API Gateway + CDN + Analytics into one system — built from scratch as a learning project.
 
-[![CI](https://github.com/your-org/edgesphere/actions/workflows/ci.yml/badge.svg)](https://github.com/your-org/edgesphere/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.5-blue)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-20-green)](https://nodejs.org/)
