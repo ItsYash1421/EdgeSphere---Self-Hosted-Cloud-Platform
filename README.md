@@ -79,15 +79,15 @@ This is **not a CRUD app**. It's a distributed system demonstrating:
 | **Storage Service** | 3002 | NestJS + MinIO | S3-compatible, multipart upload, file versioning |
 | **Analytics Service** | 3003 | NestJS + TimescaleDB | Kafka consumer, 11 SQL queries, time-series |
 | **Cache Service** | 3004 | NestJS + Redis | Distributed cache purge, pub/sub invalidation |
-| **Notification Service** | 3005 | NestJS + KafkaJS | Alert rules, email/webhook/Slack delivery |
+| **Notification Service** | 3005 | NestJS + KafkaJS + NodeMailer | Alert rules, Mailtrap SMTP email/webhook/Slack delivery |
 | **WebSocket Gateway** | 3006 | NestJS + Socket.io | Real-time metrics, live event streaming |
-| **CDN Edge A** | 8080 | NestJS + Sharp | Redis cache, image optimization, geo routing |
-| **CDN Edge B** | 8081 | NestJS + Sharp | Second edge (eu-west-1 simulation) |
+| **CDN Edge A** | 8087 | Node.js + Sharp | Redis cache, image optimization, geo routing |
+| **CDN Edge B** | 8088 | Node.js + Sharp | Second edge (eu-west-1 simulation) |
 
 ### Frontend
 | Service | Port | Tech | Description |
 |---------|------|------|-------------|
-| **Dashboard** | 3100 | Next.js 14 | Premium dark UI, 11 pages, SWR + WebSocket |
+| **Dashboard** | 3000 | Next.js 14 | Premium dark UI, 11 pages, SWR + WebSocket |
 
 ### Infrastructure
 | Component | Tech | Role |
@@ -96,6 +96,7 @@ This is **not a CRUD app**. It's a distributed system demonstrating:
 | Cache | Redis 7 | L1 cache, sessions, rate limiting, pub/sub |
 | Object Storage | MinIO | S3-compatible file storage |
 | Message Queue | Apache Kafka | Event streaming between services |
+| Email Delivery | Mailtrap | Transactional email delivery for automated alerts |
 | Metrics | Prometheus | Scrapes `/metrics` from all services |
 | Dashboards | Grafana | Visualizes all Prometheus metrics |
 | Tracing | Jaeger | Distributed request tracing |
@@ -130,8 +131,8 @@ cd apps/auth-service    && pnpm dev  # :3001
 cd apps/gateway         && pnpm dev  # :3000
 cd apps/storage-service && pnpm dev  # :3002
 cd apps/analytics-service && pnpm dev # :3003
-cd apps/cdn-service     && pnpm dev  # :8080
-cd apps/dashboard       && pnpm dev  # :3100
+cd apps/cdn-service     && pnpm dev  # :8087
+cd apps/dashboard       && pnpm dev  # :3000
 ```
 
 ### 4. Or Start Everything with Docker
@@ -142,12 +143,12 @@ bash scripts/start.sh
 ### 5. Access
 | Service | URL |
 |---------|-----|
-| Dashboard | http://localhost:3100 |
-| API Gateway | http://localhost:3000 |
-| Grafana | http://localhost:3200 (admin/admin) |
-| Prometheus | http://localhost:9090 |
-| Jaeger | http://localhost:16686 |
-| MinIO Console | http://localhost:9001 |
+| **Dashboard** | http://localhost:3000 |
+| **API Gateway** | http://localhost:3000 (API endpoints) |
+| **Grafana** | http://localhost:3200 (admin/admin) |
+| **Prometheus** | http://localhost:9090 |
+| **Jaeger** | http://localhost:16686 |
+| **MinIO Console** | http://localhost:9001 |
 
 ---
 
@@ -161,10 +162,10 @@ curl -X POST http://localhost:3000/v1/storage/buckets/my-bucket/files \
   -F "file=@photo.jpg"
 
 # Serve original
-curl http://localhost:8080/cdn/my-bucket/photo.jpg
+curl http://localhost:8087/cdn/my-bucket/photo.jpg
 
 # Serve as WebP, 400px wide, 80% quality — transforming in real-time:
-curl http://localhost:8080/cdn/my-bucket/photo.jpg?w=400&fmt=webp&q=80
+curl http://localhost:8087/cdn/my-bucket/photo.jpg?w=400&fmt=webp&q=80
 
 # Cache headers returned:
 # X-Cache: MISS (first request)
